@@ -20,6 +20,9 @@ public enum GlyphKind
 
 public static class Glyph
 {
+    [ThreadStatic]
+    private static PathGeometry? _cachedPath;
+
     public static void Draw(IGraphicsContext context, Point center, double size, Color color, GlyphKind glyph, double thickness = 1)
     {
         if (size <= 0 || thickness <= 0)
@@ -73,10 +76,13 @@ public static class Glyph
                 // Back ㄱ shape: top edge + right edge behind the front square
                 double bx = center.X - half + offset;
                 double by = center.Y - half;
-                context.DrawLine(new Point(bx, by), new Point(bx + s, by), color, thickness);                         // top
-                context.DrawLine(new Point(bx + s, by), new Point(bx + s, by + s), color, thickness);                 // right
-                context.DrawLine(new Point(bx + s, by + s), new Point(bx + s - offset, by + s), color, thickness);    // bottom stub
-                // Front square (bottom-left)
+                var g = _cachedPath ??= new PathGeometry();
+                g.Reset();
+                g.MoveTo(bx, by);
+                g.LineTo(bx + s, by);
+                g.LineTo(bx + s, by + s);
+                g.LineTo(bx + s - offset, by + s);
+                context.DrawPath(g, color, thickness);
                 context.DrawRectangle(new Rect(center.X - half, center.Y - half + offset, s, s), color, thickness);
                 return;
             }
@@ -89,9 +95,7 @@ public static class Glyph
     // Matches the legacy ComboBox drop-down chevron (2 line segments).
     private static void DrawChevron(IGraphicsContext context, Point center, double half, Color color, double thickness, bool up)
     {
-        Point p1;
-        Point p2;
-        Point p3;
+        Point p1, p2, p3;
 
         if (up)
         {
@@ -106,7 +110,8 @@ public static class Glyph
             p3 = new Point(center.X + half, center.Y - half / 2);
         }
 
-        var g = new PathGeometry();
+        var g = _cachedPath ??= new PathGeometry();
+        g.Reset();
         g.MoveTo(p1);
         g.LineTo(p2);
         g.LineTo(p3);
@@ -115,9 +120,7 @@ public static class Glyph
 
     private static void DrawChevronSide(IGraphicsContext context, Point center, double half, Color color, double thickness, bool left)
     {
-        Point p1;
-        Point p2;
-        Point p3;
+        Point p1, p2, p3;
 
         if (left)
         {
@@ -132,8 +135,8 @@ public static class Glyph
             p3 = new Point(center.X - half / 2, center.Y + half);
         }
 
-
-        var g = new PathGeometry();
+        var g = _cachedPath ??= new PathGeometry();
+        g.Reset();
         g.MoveTo(p1);
         g.LineTo(p2);
         g.LineTo(p3);
