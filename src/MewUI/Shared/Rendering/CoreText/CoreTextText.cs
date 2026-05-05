@@ -263,7 +263,7 @@ internal static unsafe partial class CoreTextText
                     double x = horizontalAlignment switch
                     {
                         TextAlignment.Center => (alignWidthPx - line.Width) / 2.0,
-                        TextAlignment.Right => Math.Max(0, alignWidthPx - line.Width),
+                        TextAlignment.Right => Math.Max(0, alignWidthPx - line.Width - 1.0),
                         _ => 0.0
                     };
 
@@ -367,67 +367,14 @@ internal static unsafe partial class CoreTextText
             return;
         }
 
-        // Reset text matrix to identity. CTLineDraw (used by DrawLineGlyphsWithFallback for
-        // lines containing glyphs not in the base font, e.g. '→' U+2192) is documented to
-        // advance the text position to the start of the next line as it draws — that
-        // position is the tx/ty components of the text matrix. CGContextSaveGState does NOT
-        // preserve the text matrix on macOS (it's not in the gstate save set per Apple's
-        // documented list), so the residual translation from a previous fallback line
-        // leaks into subsequent CTFontDrawGlyphs calls, shifting every glyph by the prior
-        // line's end-X. Visual artifact: lines after the fallback line render at the right
-        // edge of the fallback line's last character.
-        //
-        // Identity is the correct reset value for our usage:
-        //   - scale (a=1, d=1): CT fonts apply their own size; text matrix scale must be 1.
-        //   - skew (b=0, c=0): italic is a font attribute, not a text-matrix concern.
-        //   - translation (tx=0, ty=0): we want absolute positions from the `pPos` array
-        //     and the explicit CGContextSetTextPosition() in the fallback path to apply
-        //     directly, with no residual offset.
-        // It also matches the CGContext's default text matrix at construction time, so
-        // the first call is a no-op and subsequent calls just clean up after fallback paths.
-        CGContextSetTextMatrix(ctx, CGAffineTransform.Identity);
-
-        int count = text.Length;
-        Span<ushort> glyphs = count <= 1024 ? stackalloc ushort[count] : new ushort[count];
-        Span<CGSize> advances = count <= 1024 ? stackalloc CGSize[count] : new CGSize[count];
-        Span<CGPoint> positions = count <= 1024 ? stackalloc CGPoint[count] : new CGPoint[count];
-
-        fixed (char* pChars = text)
-        fixed (ushort* pGlyphs = glyphs)
-        fixed (CGSize* pAdv = advances)
-        fixed (CGPoint* pPos = positions)
-        {
-            if (!CTFontGetGlyphsForCharacters(ctFont, pChars, pGlyphs, (nuint)count))
-            {
-                // Fallback path:
-                // - CTFontGetGlyphsForCharacters returns false when any character can't be mapped using this font.
-                // - Many default fonts on macOS (e.g. SF Pro) do not include Hangul compatibility jamo (ㅁ, ㄱ, ...),
-                //   which are commonly produced during IME composition.
-                // - Rather than drawing nothing, we select a fallback CTFont per missing range via CTFontCreateForString.
-                //
-                // This is not a full shaping engine (complex scripts may still render incorrectly), but it restores
-                // basic IME visibility and keeps measurement consistent with rendering.
-                DrawLineGlyphsWithFallback(ctx, ctFont, text, x, baselineY);
-                return;
-            }
-
-            _ = CTFontGetAdvancesForGlyphs(ctFont, CTFontOrientationHorizontal, pGlyphs, pAdv, (nuint)count);
-
-            // Compact out low-surrogate slots (glyph 0, zero advance) so positions are correct.
-            int drawCount = 0;
-            double penX = x;
-            for (int i = 0; i < count; i++)
-            {
-                if (i > 0 && char.IsLowSurrogate(text[i]))
-                    continue;
-                pGlyphs[drawCount] = pGlyphs[i];
-                pPos[drawCount] = new CGPoint(penX, baselineY);
-                penX += pAdv[i].width;
-                drawCount++;
-            }
-
-            CTFontDrawGlyphs(ctFont, pGlyphs, pPos, (nuint)drawCount, ctx);
-        }
+        // Always render through CTLine so positioning matches MeasureRunWidth (which also uses
+        // CTLine via CTLineGetTypographicBounds). The previous fast path used per-glyph advance
+        // accumulation (CTFontGetAdvancesForGlyphs), which ignores kerning / ligatures / GPOS
+        // positioning that CTLine respects. Result: rendered ink was 1-3 px wider than measured
+        // width for typical Latin text, so right/center alignment placed text by measure but
+        // the actual ink overshot, getting clipped at the box's right edge by the outer
+        // bitmap clip in DrawTextLayoutCore. CTLine end-to-end keeps measure / render in sync.
+        DrawLineGlyphsWithFallback(ctx, ctFont, text, x, baselineY);
     }
 
     private readonly struct LineMetrics
@@ -818,6 +765,9 @@ internal static unsafe partial class CoreTextText
 
     [LibraryImport("/System/Library/Frameworks/CoreText.framework/CoreText")]
     private static partial double CTLineGetTypographicBounds(nint line, double* ascent, double* descent, double* leading);
+
+    [LibraryImport("/System/Library/Frameworks/CoreText.framework/CoreText")]
+    private static partial CGRect CTLineGetImageBounds(nint line, nint context);
 
     [LibraryImport("/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation")]
     private static partial nint CFStringCreateWithCharacters(nint allocator, char* chars, nint numChars);
