@@ -197,7 +197,7 @@ public sealed class VideoView : FrameworkElement
     /// Path eligibility is gated by OS (Windows-only — macOS/X11 don't have D3D11),
     /// frame metadata (must be hardware-decoded with a D3D11 texture and device), and
     /// driver capability (WGL_NV_DX_interop must load on the active GL context). If
-    /// the backend doesn't override <c>CreateImageFromExternalTexture</c> (D2D, GDI),
+    /// the backend doesn't override <c>CreateImageFromExternalSource</c> (D2D, GDI),
     /// it throws <see cref="NotSupportedException"/> which we treat as "use CPU path".
     /// </remarks>
     private IImage? TryCreateZeroCopyImage(IGraphicsFactory factory, VideoFrame frame)
@@ -231,7 +231,7 @@ public sealed class VideoView : FrameworkElement
         try
         {
             var texture = new VaapiDmaBufTexture(vaapi.VaDisplay, vaapi.VaSurfaceId, frame.Width, frame.Height);
-            var image = factory.CreateImageFromExternalTexture(texture);
+            var image = factory.CreateImageFromExternalSource(texture.AsExternalSampleSource(ExternalSampleSourceKind.OpenGLTexture));
             UpdatePresentationPath("gpu zero-copy (vaapi dma_buf → egl → gl)");
             if (!_firstPresentedFrameLogged)
             {
@@ -250,7 +250,7 @@ public sealed class VideoView : FrameworkElement
     {
         try
         {
-            var image = factory.CreateImageFromExternalTexture(vtTexture);
+            var image = factory.CreateImageFromExternalSource(vtTexture.AsExternalSampleSource(ExternalSampleSourceKind.MetalTexture));
             UpdatePresentationPath("gpu zero-copy (videotoolbox iosurface → metal)");
             if (!_firstPresentedFrameLogged)
             {
@@ -377,7 +377,7 @@ public sealed class VideoView : FrameworkElement
         }
 
         var interopTexture = new WglDxInteropTexture(d3d11.DeviceHandle, d3d11.TextureHandle, width, height);
-        var image = factory.CreateImageFromExternalTexture(interopTexture);
+        var image = factory.CreateImageFromExternalSource(interopTexture.AsExternalSampleSource(ExternalSampleSourceKind.OpenGLTexture));
         cached = new CachedGlInteropEntry(interopTexture, image);
         _glInteropCache.Add(d3d11.TextureHandle, cached);
         return cached;
