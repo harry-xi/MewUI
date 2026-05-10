@@ -108,7 +108,7 @@ internal sealed class PboFenceUploaderPool : IDisposable
 /// Thin <see cref="IExternalLockedTexture"/> wrapper that returns its inner
 /// <see cref="PboFenceUploader"/> to a pool on <see cref="Dispose"/> instead of
 /// destroying the underlying GL resources. Used by the factory so that an
-/// <see cref="MewVGExternalLockedImage"/> with <c>ownsTexture: true</c>
+/// <see cref="MewVG.MewVGExternalLockedImage"/> with <c>ownsTexture: true</c>
 /// transparently routes the disposal to the pool.
 /// </summary>
 internal sealed class PooledPboTexture : IExternalLockedTexture
