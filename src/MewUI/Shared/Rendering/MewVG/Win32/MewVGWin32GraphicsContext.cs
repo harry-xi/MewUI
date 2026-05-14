@@ -19,7 +19,7 @@ internal sealed partial class MewVGWin32GraphicsContext
     }
 
     internal static MewVGWin32GraphicsContext CreateForWindow(
-        MewVGWindowResources resources,
+        MewVGWin32WindowResources resources,
         IMewVGOffscreenSurfaceProvider offscreenProvider,
         nint hwnd,
         nint hdc)
@@ -41,7 +41,7 @@ internal sealed partial class MewVGWin32GraphicsContext
         => new(new OffscreenPixelSurfaceFrameSession(offscreen, offscreenProvider, pixelSurface, hdc));
 
     internal static MewVGWin32GraphicsContext CreateForLayeredWindow(
-        MewVGWindowResources resources,
+        MewVGWin32WindowResources resources,
         IMewVGOffscreenSurfaceProvider offscreenProvider,
         nint hwnd,
         nint hdc,
@@ -479,12 +479,12 @@ internal sealed partial class MewVGWin32GraphicsContext
 
     private sealed class WindowBackbufferFrameSession : IWin32FrameSession
     {
-        private readonly MewVGWindowResources _resources;
+        private readonly MewVGWin32WindowResources _resources;
         private readonly IMewVGOffscreenSurfaceProvider _offscreenProvider;
         private nint _hwnd;
         private nint _hdc;
 
-        public WindowBackbufferFrameSession(MewVGWindowResources resources, IMewVGOffscreenSurfaceProvider offscreenProvider, nint hwnd, nint hdc)
+        public WindowBackbufferFrameSession(MewVGWin32WindowResources resources, IMewVGOffscreenSurfaceProvider offscreenProvider, nint hwnd, nint hdc)
         {
             _resources = resources;
             _offscreenProvider = offscreenProvider;
@@ -533,12 +533,12 @@ internal sealed partial class MewVGWin32GraphicsContext
 
     private sealed class WindowPixelSurfaceFrameSession : IWin32FrameSession
     {
-        private readonly MewVGWindowResources _resources;
+        private readonly MewVGWin32WindowResources _resources;
         private readonly IMewVGOffscreenSurfaceProvider _offscreenProvider;
         private readonly nint _hdc;
         private readonly OpenGLPixelRenderSurface _pixelSurface;
 
-        public WindowPixelSurfaceFrameSession(MewVGWindowResources resources, IMewVGOffscreenSurfaceProvider offscreenProvider, nint hwnd, nint hdc, OpenGLPixelRenderSurface pixelSurface)
+        public WindowPixelSurfaceFrameSession(MewVGWin32WindowResources resources, IMewVGOffscreenSurfaceProvider offscreenProvider, nint hwnd, nint hdc, OpenGLPixelRenderSurface pixelSurface)
         {
             _resources = resources;
             _offscreenProvider = offscreenProvider;

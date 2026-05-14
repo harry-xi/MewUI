@@ -1,13 +1,40 @@
+using Aprillz.MewVG;
 using Aprillz.MewUI.Platform;
 using Aprillz.MewUI.Rendering.CoreText;
 
 namespace Aprillz.MewUI.Rendering.MewVG;
 
-public sealed partial class MewVGGraphicsFactory
+public sealed partial class MewVGMacOSGraphicsFactory
 {
     private readonly MewVGMetalOffscreenSurfaceProvider _offscreenProvider = new();
+    private nint _cachedMetalDevice;
 
     public string Backend => "MewVG.MacOS";
+
+    /// <summary>
+    /// Native <c>id&lt;MTLDevice&gt;</c> this factory's window resources draw with.
+    /// Cross-API integrators (Skia GR Metal, video samplers, custom effects) read this and
+    /// pass it to their own context constructors so the <c>MTLTexture</c> they produce can
+    /// be sample-able by MewVG without cross-device copy.
+    /// </summary>
+    /// <remarks>
+    /// Apple's <c>MTLCreateSystemDefaultDevice()</c> returns a process singleton on consumer
+    /// hardware, so the value matches what every other caller of <c>CreateSystemDefaultDevice</c>
+    /// gets. Reading through this accessor instead of duplicating the system-default call keeps
+    /// the binding stable if the backend later switches to a non-default device (eGPU,
+    /// multi-GPU systems).
+    /// </remarks>
+    public nint NativeMetalDevice
+    {
+        get
+        {
+            if (_cachedMetalDevice == 0)
+            {
+                _cachedMetalDevice = MetalDevice.CreateSystemDefaultDevice();
+            }
+            return _cachedMetalDevice;
+        }
+    }
 
     private partial IFont CreateFontCore(string family, double size, FontWeight weight, bool italic, bool underline, bool strikethrough)
     {
@@ -37,7 +64,11 @@ public sealed partial class MewVGGraphicsFactory
             throw new ArgumentException("MewVG (Metal) requires a macOS Metal window surface.", nameof(surface));
         }
 
-        return MewVGMetalWindowResources.Create(metal.View, metal.MetalLayer);
+        // Use the factory's canonical device handle instead of having each window resource
+        // re-call MTLCreateSystemDefaultDevice. The value is the same (Apple singleton) but
+        // routing through the factory makes the lifetime/sharing explicit and gives cross-API
+        // integrators (Skia GR Metal, etc.) the same handle the backend uses.
+        return MewVGMetalWindowResources.Create(metal.View, metal.MetalLayer, NativeMetalDevice);
     }
 
     private partial IGraphicsContext CreateContextCore(WindowRenderTarget target, IDisposable resources)
@@ -75,7 +106,9 @@ public sealed partial class MewVGGraphicsFactory
             return;
         }
 
-        renderTarget = new MewVGMetalPixelRenderSurface(pixelWidth, pixelHeight, dpiScale, hasAlpha);
+        var surface = new MewVGMetalPixelRenderSurface(pixelWidth, pixelHeight, dpiScale, hasAlpha);
+        surface.EnsureGpuTextures(NativeMetalDevice, _offscreenProvider.TryGetFilterCommandQueue());
+        renderTarget = surface;
         handled = true;
     }
 
@@ -107,7 +140,7 @@ public sealed partial class MewVGGraphicsFactory
         // own MTLTexture back into its CPU pixel buffer at EndFrame
         // so filter / pattern uploads see the rendered output.
         var offscreenResources = _offscreenProvider.AcquireSurface();
-        context = MewVGMetalGraphicsContext.CreateForOffscreen(offscreenResources, pixelSurface, _offscreenProvider);
+        context = MewVGMacOSGraphicsContext.CreateForOffscreen(offscreenResources, pixelSurface, _offscreenProvider);
         handled = true;
     }
 

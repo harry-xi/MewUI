@@ -10,7 +10,7 @@ using Aprillz.MewUI.Resources;
 
 namespace Aprillz.MewUI.Rendering.MewVG;
 
-public sealed partial class MewVGGraphicsFactory
+public sealed partial class MewVGWin32GraphicsFactory
 {
     private readonly IMewVGOffscreenSurfaceProvider _offscreenProvider =
         new MewVGGlOffscreenSurfaceProvider(OpenGL32.wglGetCurrentContext, "MewVG Win32");
@@ -79,7 +79,7 @@ public sealed partial class MewVGGraphicsFactory
 
         // Share textures/buffers with the worker context so background offscreen render
         // tasks (Task.Run) can hand off FBO textures to this window for sampling.
-        return MewVGWindowResources.Create(win32.Hwnd, win32.Hdc, SharedWorkerContext);
+        return MewVGWin32WindowResources.Create(win32.Hwnd, win32.Hdc, SharedWorkerContext);
     }
 
     private partial IGraphicsContext CreateContextCore(WindowRenderTarget target, IDisposable resources)
@@ -89,7 +89,7 @@ public sealed partial class MewVGGraphicsFactory
             throw new ArgumentException("MewVG (Win32) requires a Win32 HDC window surface.", nameof(target));
         }
 
-        var res = (MewVGWindowResources)resources;
+        var res = (MewVGWin32WindowResources)resources;
         return res.GetOrCreateContext(_offscreenProvider, win32.Hwnd, win32.Hdc);
     }
 
@@ -108,6 +108,7 @@ public sealed partial class MewVGGraphicsFactory
             pixelHeight,
             dpiScale,
             _offscreenProvider.QueueTargetDisposal,
+            OpenGL32.wglGetCurrentContext,
             hasAlpha);
         handled = true;
     }
@@ -491,7 +492,7 @@ internal sealed class MewVGWin32LayeredPresenter : IDisposable
     private readonly object _lock = new();
     private readonly Dictionary<nint, OpenGLPixelRenderSurface> _layeredTargets = new();
     private readonly Dictionary<nint, Win32LayeredBitmap> _layeredStagingTargets = new();
-    private readonly Dictionary<nint, MewVGWindowResources> _layeredWindowResources = new();
+    private readonly Dictionary<nint, MewVGWin32WindowResources> _layeredWindowResources = new();
 
     public MewVGWin32LayeredPresenter(IMewVGOffscreenSurfaceProvider offscreenProvider, Func<nint> getShareContext)
     {
@@ -571,7 +572,7 @@ internal sealed class MewVGWin32LayeredPresenter : IDisposable
         }
     }
 
-    internal MewVGWindowResources GetOrCreateWindowResources(nint hwnd, nint hdc)
+    internal MewVGWin32WindowResources GetOrCreateWindowResources(nint hwnd, nint hdc)
     {
         if (hwnd == 0 || hdc == 0)
         {
@@ -585,7 +586,7 @@ internal sealed class MewVGWin32LayeredPresenter : IDisposable
                 return existing;
             }
 
-            var created = MewVGWindowResources.Create(hwnd, hdc, _getShareContext());
+            var created = MewVGWin32WindowResources.Create(hwnd, hdc, _getShareContext());
             _layeredWindowResources[hwnd] = created;
             return created;
         }

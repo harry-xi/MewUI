@@ -121,11 +121,14 @@ internal sealed class PooledPboTexture : IExternalRasterSource
         _pool = pool;
     }
 
-    public nint NativeHandle => _inner?.NativeHandle ?? 0;
     public int PixelWidth => _inner?.PixelWidth ?? 0;
     public int PixelHeight => _inner?.PixelHeight ?? 0;
+    public int Version => _inner?.Version ?? 0;
+    public RenderPixelFormat Format => _inner?.Format ?? RenderPixelFormat.Bgra8888;
     public BitmapAlphaMode AlphaMode => _inner?.AlphaMode ?? BitmapAlphaMode.Ignore;
     public bool YFlipped => _inner?.YFlipped ?? false;
+    public SurfaceCapabilities Capabilities => _inner?.Capabilities ?? SurfaceCapabilities.None;
+    public IReadOnlyList<ExternalRasterPlane> Planes => _inner?.Planes ?? Array.Empty<ExternalRasterPlane>();
 
     public IExternalRasterLease Acquire()
         => _inner?.Acquire() ?? EmptyRasterLease.Instance;
@@ -135,5 +138,14 @@ internal sealed class PooledPboTexture : IExternalRasterSource
         if (_inner is null) return;
         _pool.Return(_inner);
         _inner = null;
+    }
+
+    private sealed class EmptyRasterLease : IExternalRasterLease
+    {
+        public static readonly EmptyRasterLease Instance = new();
+        public int PixelWidth => 0;
+        public int PixelHeight => 0;
+        public bool YFlipped => false;
+        public void Dispose() { }
     }
 }

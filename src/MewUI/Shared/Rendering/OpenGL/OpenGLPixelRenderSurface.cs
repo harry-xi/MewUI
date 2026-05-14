@@ -7,7 +7,7 @@ namespace Aprillz.MewUI.Rendering.OpenGL;
 /// OpenGL pixel render surface using FBO (Framebuffer Object).
 /// Provides offscreen rendering with CPU-side pixel buffer access.
 /// </summary>
-internal sealed class OpenGLPixelRenderSurface : IPixelBufferSource, ICpuPixelSurface, IDeferredCpuReadableSurface, IDisposable, IGLTextureSource
+internal sealed class OpenGLPixelRenderSurface : IPixelBufferSource, ICpuPixelSurface, IDeferredCpuReadableSurface, IDisposable, IGLTextureSource, IExternalWritableGpuSurface
 {
     // Lazily allocated — only when a CPU consumer (Lock / CopyPixels / GetPixelSpan)
     // actually requests pixel bytes. The pure GPU-only path (MewVGImage zero-copy via
@@ -16,6 +16,7 @@ internal sealed class OpenGLPixelRenderSurface : IPixelBufferSource, ICpuPixelSu
     private byte[]? _pixels;
     private readonly object _gate = new();
     private readonly Action<OpenGLPixelRenderSurface>? _glDisposeRequested;
+    private readonly Func<nint>? _currentContextProvider;
     private int _version;
     private bool _disposed;
 
@@ -54,6 +55,7 @@ internal sealed class OpenGLPixelRenderSurface : IPixelBufferSource, ICpuPixelSu
 
     public OpenGLPixelRenderSurface(int pixelWidth, int pixelHeight, double dpiScale,
         Action<OpenGLPixelRenderSurface>? glDisposeRequested = null,
+        Func<nint>? currentContextProvider = null,
         bool hasAlpha = true)
     {
         ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(pixelWidth, 0);
@@ -65,6 +67,7 @@ internal sealed class OpenGLPixelRenderSurface : IPixelBufferSource, ICpuPixelSu
         DpiScale = dpiScale;
         HasAlpha = hasAlpha;
         _glDisposeRequested = glDisposeRequested;
+        _currentContextProvider = currentContextProvider;
         // _pixels left null — see EnsurePixelBuffer.
     }
 
@@ -137,7 +140,8 @@ internal sealed class OpenGLPixelRenderSurface : IPixelBufferSource, ICpuPixelSu
         RenderSurfaceDefaults.GetPixelSurfaceCapabilities(
             IsPremultiplied,
             LockMode == LockMode.Readback,
-            this is IGpuTextureSource);
+            this is IGpuTextureSource) |
+        SurfaceCapabilities.ExternalGpuWritable;
 
     ulong IRenderSurface.Version => (ulong)Math.Max(0, Version);
 
@@ -252,6 +256,39 @@ internal sealed class OpenGLPixelRenderSurface : IPixelBufferSource, ICpuPixelSu
 
     private const uint GL_REPEAT = 0x2901;
 
+    private sealed class ExternalWriteScope : IGlExternalGpuWriteScope
+    {
+        private readonly OpenGLPixelRenderSurface _surface;
+        private readonly int _previousFramebuffer;
+        private readonly int[] _previousViewport = new int[4];
+        private bool _disposed;
+
+        public ExternalWriteScope(OpenGLPixelRenderSurface surface)
+        {
+            _surface = surface;
+            _previousFramebuffer = GL.GetInteger(OpenGLExt.GL_FRAMEBUFFER_BINDING);
+            GL.GetIntegers(OpenGLExt.GL_VIEWPORT, _previousViewport);
+            OpenGLExt.BindFramebuffer(OpenGLExt.GL_FRAMEBUFFER, surface._fbo);
+            GL.Viewport(0, 0, surface.PixelWidth, surface.PixelHeight);
+        }
+
+        public int PixelWidth => _surface.PixelWidth;
+        public int PixelHeight => _surface.PixelHeight;
+        public bool YFlipped => true;
+        public uint FramebufferId => _surface._fbo;
+        public uint TextureId => _surface._texture;
+
+        public void Flush() => GL.Flush();
+
+        public void Dispose()
+        {
+            if (_disposed) return;
+            _disposed = true;
+            OpenGLExt.BindFramebuffer(OpenGLExt.GL_FRAMEBUFFER, (uint)Math.Max(0, _previousFramebuffer));
+            GL.Viewport(_previousViewport[0], _previousViewport[1], _previousViewport[2], _previousViewport[3]);
+        }
+    }
+
     /// <inheritdoc cref="IGpuTextureSource.RetainGpuHandle"/>
     public bool RetainGpuHandle(nint handle)
     {
@@ -325,6 +362,33 @@ internal sealed class OpenGLPixelRenderSurface : IPixelBufferSource, ICpuPixelSu
     public void IncrementVersion()
     {
         Interlocked.Increment(ref _version);
+    }
+
+    public IExternalGpuWriteScope BeginExternalWrite()
+    {
+        if (_disposed)
+        {
+            throw new ObjectDisposedException(nameof(OpenGLPixelRenderSurface));
+        }
+
+        InitializeFbo();
+        if (!_fboInitialized || _fbo == 0 || _texture == 0)
+        {
+            throw new InvalidOperationException("OpenGL external write target could not initialize its FBO.");
+        }
+
+        if (_creationContext == 0 && _currentContextProvider is not null)
+        {
+            RecordCreationContext(_currentContextProvider());
+        }
+
+        return new ExternalWriteScope(this);
+    }
+
+    public void MarkExternalContentChanged()
+    {
+        RequestDeferredReadback();
+        IncrementVersion();
     }
 
     public void Dispose()

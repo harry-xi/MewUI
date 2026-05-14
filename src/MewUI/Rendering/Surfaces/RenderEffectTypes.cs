@@ -39,7 +39,7 @@ public readonly record struct ShaderModuleDescriptor(
 public readonly record struct RenderEffectInput(
     string Name,
     IRenderSurface? Surface = null,
-    IExternalSampleSource? ExternalSample = null);
+    IExternalRasterSource? ExternalRaster = null);
 
 public readonly record struct RenderEffectParameter(
     string Name,

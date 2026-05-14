@@ -9,7 +9,7 @@ using Aprillz.MewUI.Resources;
 
 namespace Aprillz.MewUI.Rendering.MewVG;
 
-public sealed partial class MewVGGraphicsFactory
+public sealed partial class MewVGX11GraphicsFactory
 {
     private readonly IMewVGOffscreenSurfaceProvider _offscreenProvider =
         new MewVGGlOffscreenSurfaceProvider(LibGL.glXGetCurrentContext, "MewVG X11");
@@ -206,6 +206,7 @@ public sealed partial class MewVGGraphicsFactory
             pixelHeight,
             dpiScale,
             _offscreenProvider.QueueTargetDisposal,
+            LibGL.glXGetCurrentContext,
             hasAlpha);
         handled = true;
     }

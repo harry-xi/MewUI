@@ -3,18 +3,8 @@ namespace Aprillz.MewUI.Resources;
 /// <summary>
 /// Exposes a lockable CPU-side pixel buffer that backends can upload to GPU resources.
 /// </summary>
-public interface IPixelBufferSource
+public interface IPixelBufferSource : IRasterSource
 {
-    /// <summary>
-    /// Gets the buffer width in pixels.
-    /// </summary>
-    int PixelWidth { get; }
-
-    /// <summary>
-    /// Gets the buffer height in pixels.
-    /// </summary>
-    int PixelHeight { get; }
-
     /// <summary>
     /// Gets the stride in bytes per row.
     /// </summary>
@@ -60,11 +50,6 @@ public interface IPixelBufferSource
     /// before invoking <c>Lock</c>.
     /// </summary>
     LockMode LockMode => LockMode.Direct;
-
-    /// <summary>
-    /// Monotonically increasing version. Backends can use this to detect changes.
-    /// </summary>
-    int Version { get; }
 
     /// <summary>
     /// Locks and returns the current pixel buffer snapshot.

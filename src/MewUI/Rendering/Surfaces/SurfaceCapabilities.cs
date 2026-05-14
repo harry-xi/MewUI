@@ -23,4 +23,5 @@ public enum SurfaceCapabilities
 
     Alpha = 1 << 11,
     Premultiplied = 1 << 12,
+    ExternalGpuWritable = 1 << 13,
 }

@@ -7,7 +7,7 @@ using Aprillz.MewVG.Tess;
 namespace Aprillz.MewUI.Rendering.MewVG;
 
 #if MEWUI_MEWVG_MACOS
-internal sealed partial class MewVGMetalGraphicsContext : GraphicsContextBase
+internal sealed partial class MewVGMacOSGraphicsContext : GraphicsContextBase
 #elif MEWUI_MEWVG_X11
 internal sealed partial class MewVGX11GraphicsContext : GraphicsContextBase
 #else
@@ -75,9 +75,9 @@ internal sealed partial class MewVGWin32GraphicsContext : GraphicsContextBase
         _saveStack.Clear();
         if (_acquiredExternalsThisFrame.Count > 0)
         {
-            foreach (var t in _acquiredExternalsThisFrame)
+            foreach (var (_, lease) in _acquiredExternalsThisFrame)
             {
-                t.Release();
+                lease.Dispose();
             }
             _acquiredExternalsThisFrame.Clear();
         }
@@ -760,12 +760,18 @@ internal sealed partial class MewVGWin32GraphicsContext : GraphicsContextBase
             paint = _vg.ImagePattern(patternX, patternY, patternW, patternH, 0f, imageId, alpha);
         }
 
-        _vg.ShapeAntiAlias(false);
+        // Outline AA only matters when the rect is rasterised non-axis-aligned
+        // (rotation/skew). Axis-aligned image fills land on integer pixel boundaries —
+        // the texture's own sampling handles edges and shape AA would add a needless
+        // half-pixel feather. D2D applies the same coverage AA implicitly on its
+        // bitmap draw; this matches that behaviour.
+        bool isAxisAligned = _transform.M12 == 0f && _transform.M21 == 0f;
+        if (isAxisAligned) _vg.ShapeAntiAlias(false);
         _vg.BeginPath();
         _vg.Rect((float)destRect.X, (float)destRect.Y, (float)destRect.Width, (float)destRect.Height);
         _vg.FillPaint(paint);
         _vg.Fill();
-        _vg.ShapeAntiAlias(true);
+        if (isAxisAligned) _vg.ShapeAntiAlias(true);
     }
 
     private NVGimageFlags GetImageFlags()

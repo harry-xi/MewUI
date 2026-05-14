@@ -17,9 +17,10 @@ internal sealed unsafe class GlxOpenGLWindowResources : IOpenGLWindowResources
     private bool _disposed;
 
     public nint GlxContext { get; }
+
     public bool SupportsBgra { get; }
+
     public bool SupportsNpotTextures { get; }
-    public OpenGLTextCache TextCache { get; } = new();
 
     private GlxOpenGLWindowResources(
         nint display,
@@ -410,7 +411,6 @@ internal sealed unsafe class GlxOpenGLWindowResources : IOpenGLWindowResources
             GL.DeleteTextures(1, ref t);
         }
         _textures.Clear();
-        TextCache.Dispose();
         ReleaseCurrent();
 
         LibGL.glXDestroyContext(_display, GlxContext);

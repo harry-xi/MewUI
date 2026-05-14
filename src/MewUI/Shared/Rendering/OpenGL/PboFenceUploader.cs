@@ -40,9 +40,12 @@ internal sealed unsafe class PboFenceUploader : IExternalRasterSource
     private bool _initialized;
     private bool _disposed;
 
-    public nint NativeHandle => (nint)_textureId;
     public int PixelWidth => _pixelWidth;
     public int PixelHeight => _pixelHeight;
+    public int Version => _lastUploadedVersion;
+    public RenderPixelFormat Format => AlphaMode == BitmapAlphaMode.Premultiplied
+        ? RenderPixelFormat.Bgra8888Premultiplied
+        : RenderPixelFormat.Bgra8888;
     public BitmapAlphaMode AlphaMode => _source.IsPremultiplied
         ? BitmapAlphaMode.Premultiplied
         : BitmapAlphaMode.Straight;
@@ -53,6 +56,19 @@ internal sealed unsafe class PboFenceUploader : IExternalRasterSource
     /// <c>CreateImageBGRA</c> path, so no FlipY needed.
     /// </summary>
     public bool YFlipped => false;
+
+    public SurfaceCapabilities Capabilities =>
+        SurfaceCapabilities.ExternalHandle |
+        SurfaceCapabilities.ExternallySynchronized |
+        SurfaceCapabilities.GpuSampleable |
+        SurfaceCapabilities.AsyncCompletion |
+        (_source.HasAlpha ? SurfaceCapabilities.Alpha : SurfaceCapabilities.None) |
+        (_source.IsPremultiplied ? SurfaceCapabilities.Premultiplied : SurfaceCapabilities.None);
+
+    public IReadOnlyList<ExternalRasterPlane> Planes =>
+    [
+        new ExternalRasterPlane(0, (nint)_textureId, _pixelWidth, _pixelHeight, 0, Format)
+    ];
 
     /// <summary>
     /// Probe whether PBO + fence GL calls are available on the current context.
@@ -221,10 +237,31 @@ internal sealed unsafe class PboFenceUploader : IExternalRasterSource
         _lastUploadedVersion = currentVersion;
     }
 
-    public void Release()
+    private void ReleaseTexture()
     {
         // Nothing per-frame to release; the texture stays valid across frames
         // until Dispose. Acquire's fence wait already handled sync.
+    }
+
+    private sealed class GlLease : IGlTextureLease
+    {
+        private PboFenceUploader? _owner;
+
+        public GlLease(PboFenceUploader owner)
+        {
+            _owner = owner;
+        }
+
+        public uint TextureId => _owner?._textureId ?? 0;
+        public int PixelWidth => _owner?._pixelWidth ?? 0;
+        public int PixelHeight => _owner?._pixelHeight ?? 0;
+        public bool YFlipped => _owner?.YFlipped ?? false;
+
+        public void Dispose()
+        {
+            var owner = Interlocked.Exchange(ref _owner, null);
+            owner?.ReleaseTexture();
+        }
     }
 
     public void Dispose()

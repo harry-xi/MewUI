@@ -17,10 +17,9 @@ namespace Aprillz.MewUI.Rendering.OpenGL;
 /// <list type="number">
 ///   <item>Construction: <c>wglDXOpenDeviceNV</c> on D3D11 device, allocate GL
 ///         texture name, <c>wglDXRegisterObjectNV</c> binds the D3D11 texture to it.</item>
-///   <item>Per frame: backend calls <see cref="Acquire"/> →
-///         <c>wglDXLockObjectsNV</c>; <see cref="NativeHandle"/> exposes the GL
-///         texture id which NVG samples.</item>
-///   <item>Per frame end: backend calls <see cref="Release"/> →
+///   <item>Per frame: backend calls <see cref="Acquire"/> and receives an
+///         <see cref="IGlTextureLease"/> whose texture id NVG reads.</item>
+///   <item>Per frame end: backend disposes the lease, which calls
 ///         <c>wglDXUnlockObjectsNV</c>; D3D11 may modify the texture again.</item>
 ///   <item>Disposal: unlock if needed, <c>wglDXUnregisterObjectNV</c>,
 ///         <c>glDeleteTextures</c>, <c>wglDXCloseDeviceNV</c>.</item>
@@ -46,16 +45,30 @@ public sealed unsafe class WglDxInteropTexture : IExternalRasterSource
     private bool _locked;
     private bool _disposed;
 
-    public nint NativeHandle => (nint)_glTextureId;
     public int PixelWidth { get; }
     public int PixelHeight { get; }
+    public int Version => 0;
+    public RenderPixelFormat Format => AlphaMode == BitmapAlphaMode.Premultiplied
+        ? RenderPixelFormat.Bgra8888Premultiplied
+        : RenderPixelFormat.Bgra8888;
 
     public BitmapAlphaMode AlphaMode { get; }
 
     /// <summary>D3D11 textures are top-down (row 0 = top), unlike GL FBOs.
-    /// MewVGExternalLockedImage adds <c>NVG_IMAGE_FLIPY</c> when this is
+    /// MewVGExternalRasterImage adds <c>NVG_IMAGE_FLIPY</c> when this is
     /// <see langword="true"/>; for D3D11 sources we report <see langword="false"/>.</summary>
     public bool YFlipped => false;
+    public SurfaceCapabilities Capabilities =>
+        SurfaceCapabilities.ExternalHandle |
+        SurfaceCapabilities.ExternallySynchronized |
+        SurfaceCapabilities.GpuSampleable |
+        SurfaceCapabilities.Alpha |
+        (AlphaMode == BitmapAlphaMode.Premultiplied ? SurfaceCapabilities.Premultiplied : SurfaceCapabilities.None);
+
+    public IReadOnlyList<ExternalRasterPlane> Planes =>
+    [
+        new ExternalRasterPlane(0, (nint)_glTextureId, PixelWidth, PixelHeight, 0, Format)
+    ];
 
     /// <summary>True when WGL_NV_DX_interop is loaded and usable on the current GL
     /// context. Call this before constructing — construction throws when the
@@ -114,18 +127,45 @@ public sealed unsafe class WglDxInteropTexture : IExternalRasterSource
         }
     }
 
-    public void Acquire()
+    public IExternalRasterLease Acquire()
+    {
+        Lock();
+        return new GlLease(this);
+    }
+
+    private void Lock()
     {
         if (_disposed || _locked) return;
         WglDxInterop.LockObject(_wglDevice, _wglObject);
         _locked = true;
     }
 
-    public void Release()
+    private void Unlock()
     {
         if (_disposed || !_locked) return;
         WglDxInterop.UnlockObject(_wglDevice, _wglObject);
         _locked = false;
+    }
+
+    private sealed class GlLease : IGlTextureLease
+    {
+        private WglDxInteropTexture? _owner;
+
+        public GlLease(WglDxInteropTexture owner)
+        {
+            _owner = owner;
+        }
+
+        public uint TextureId => _owner?._glTextureId ?? 0;
+        public int PixelWidth => _owner?.PixelWidth ?? 0;
+        public int PixelHeight => _owner?.PixelHeight ?? 0;
+        public bool YFlipped => _owner?.YFlipped ?? false;
+
+        public void Dispose()
+        {
+            var owner = Interlocked.Exchange(ref _owner, null);
+            owner?.Unlock();
+        }
     }
 
     public void Dispose()

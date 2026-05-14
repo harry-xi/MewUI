@@ -4,7 +4,7 @@ using Aprillz.MewVG;
 
 namespace Aprillz.MewUI.Rendering.MewVG;
 
-internal sealed class MewVGWindowResources : IDisposable
+internal sealed class MewVGWin32WindowResources : IDisposable
 {
     /// <summary>
     /// MSAA sample count. 1 = no MSAA, 4 or 8 for hardware multisampling.
@@ -47,7 +47,7 @@ internal sealed class MewVGWindowResources : IDisposable
         }
     }
 
-    private MewVGWindowResources(nint hwnd, WglOpenGLWindowResources gl, NanoVGGL vg)
+    private MewVGWin32WindowResources(nint hwnd, WglOpenGLWindowResources gl, NanoVGGL vg)
     {
         _hwnd = hwnd;
         _gl = gl;
@@ -55,7 +55,7 @@ internal sealed class MewVGWindowResources : IDisposable
         TextCache = new MewVGTextCache(vg);
     }
 
-    public static MewVGWindowResources Create(nint hwnd, nint hdc, nint shareContext = 0)
+    public static MewVGWin32WindowResources Create(nint hwnd, nint hdc, nint shareContext = 0)
     {
         // NanoVG uses stencil for AA and clipping; request a stencil buffer when selecting pixel format.
         var gl = WglOpenGLWindowResources.Create(hwnd, hdc,
@@ -74,7 +74,7 @@ internal sealed class MewVGWindowResources : IDisposable
                 ? NVGcreateFlags.None
                 : NVGcreateFlags.Antialias;
             var vg = new NanoVGGL(flags);
-            return new MewVGWindowResources(hwnd, gl, vg);
+            return new MewVGWin32WindowResources(hwnd, gl, vg);
         }
         finally
         {

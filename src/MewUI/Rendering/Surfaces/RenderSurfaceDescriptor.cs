@@ -93,6 +93,25 @@ public readonly record struct RenderSurfaceDescriptor(
             SurfaceLifetimeHint.Cached,
             debugName);
 
+    public static RenderSurfaceDescriptor ExternalGpuWritable(
+        int pixelWidth,
+        int pixelHeight,
+        double dpiScale = 1.0,
+        bool hasAlpha = true,
+        string? debugName = null)
+        => new(
+            pixelWidth,
+            pixelHeight,
+            dpiScale,
+            RenderPixelFormat.Bgra8888Premultiplied,
+            SurfaceUsage.Offscreen | SurfaceUsage.ImageSource,
+            SurfaceCapabilities.GpuSampleable |
+            SurfaceCapabilities.CacheableImageSource |
+            SurfaceCapabilities.ExternalGpuWritable |
+            (hasAlpha ? SurfaceCapabilities.Alpha | SurfaceCapabilities.Premultiplied : SurfaceCapabilities.None),
+            SurfaceLifetimeHint.Cached,
+            debugName);
+
     public static RenderSurfaceDescriptor PresenterIntermediate(
         int pixelWidth,
         int pixelHeight,

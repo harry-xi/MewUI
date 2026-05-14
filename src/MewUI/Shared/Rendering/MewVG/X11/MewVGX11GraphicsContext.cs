@@ -366,10 +366,10 @@ internal sealed partial class MewVGX11GraphicsContext
     {
         ArgumentNullException.ThrowIfNull(image);
 
-        if (image is MewVGExternalLockedImage extImage)
+        if (image is MewVGExternalRasterImage extImage)
         {
-            EnsureExternalAcquired(extImage.Texture);
-            int extImageId = extImage.GetOrCreateImageId(_vg, GetImageFlags());
+            var lease = EnsureExternalAcquired(extImage.Source);
+            int extImageId = extImage.GetOrCreateImageId(_vg, lease, GetImageFlags());
             if (extImageId == 0) return;
             DrawImagePattern(extImageId, destRect, alpha: 1f, sourceRect: null,
                 image.PixelWidth, image.PixelHeight);
@@ -394,10 +394,10 @@ internal sealed partial class MewVGX11GraphicsContext
     {
         ArgumentNullException.ThrowIfNull(image);
 
-        if (image is MewVGExternalLockedImage extImage)
+        if (image is MewVGExternalRasterImage extImage)
         {
-            EnsureExternalAcquired(extImage.Texture);
-            int extImageId = extImage.GetOrCreateImageId(_vg, GetImageFlags());
+            var lease = EnsureExternalAcquired(extImage.Source);
+            int extImageId = extImage.GetOrCreateImageId(_vg, lease, GetImageFlags());
             if (extImageId == 0) return;
             DrawImagePattern(extImageId, destRect, alpha: 1f, sourceRect: sourceRect,
                 image.PixelWidth, image.PixelHeight);
@@ -474,6 +474,7 @@ internal sealed partial class MewVGX11GraphicsContext
         }
 
         public NanoVGGL Vg => _resources.Vg;
+
         public MewVGTextCache TextCache => _resources.TextCache;
 
         public void SetTarget(nint display, nint window)
@@ -534,6 +535,7 @@ internal sealed partial class MewVGX11GraphicsContext
         }
 
         public NanoVGGL Vg => _offscreen.Vg;
+
         public MewVGTextCache TextCache => _offscreen.TextCache;
 
         public void BeginFrame()

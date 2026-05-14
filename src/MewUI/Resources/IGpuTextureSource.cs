@@ -1,8 +1,8 @@
 namespace Aprillz.MewUI.Resources;
 
 /// <summary>
-/// Marker interface for pixel sources whose pixels live primarily on the GPU. Sits one
-/// tier above <see cref="IPixelBufferSource"/> and below the per-backend marker
+/// Marker interface for raster sources whose pixels live primarily on the GPU. Sits one
+/// tier above <see cref="IRasterSource"/> and below the per-backend marker
 /// interfaces (<c>ID2DTextureSource</c>, <c>IGLTextureSource</c>, <c>IMetalTextureSource</c>)
 /// defined in their respective backend assemblies.
 /// </summary>
@@ -16,21 +16,21 @@ namespace Aprillz.MewUI.Resources;
 ///   <item>Core has zero knowledge of any specific GPU backend.</item>
 ///   <item>A consumer that wants zero-copy interop with a particular backend casts to
 ///         that backend's marker (<c>source is IGLTextureSource gl</c>); cross-backend
-///         sources fall through to the generic <see cref="IPixelBufferSource.Lock"/>
-///         path automatically.</item>
+///         sources can choose a CPU readback path separately when they also implement
+///         <see cref="IPixelBufferSource"/>.</item>
 ///   <item>Adding a new backend (Vulkan, WebGPU) defines its own marker in its own
 ///         assembly without modifying core.</item>
 /// </list>
 /// <para>
-/// All implementers should also implement <see cref="IPixelBufferSource"/>; CPU-side
-/// readback through <c>Lock</c> is the universal fallback.
+/// CPU-side readback is intentionally not part of this contract. Implement
+/// <see cref="IPixelBufferSource"/> separately when CPU access is supported.
 /// </para>
 /// </remarks>
-public interface IGpuTextureSource : IPixelBufferSource
+public interface IGpuTextureSource : IRasterSource
 {
     /// <summary>
     /// Width of the GPU texture in texels. Usually equal to
-    /// <see cref="IPixelBufferSource.PixelWidth"/>; declared separately so future
+    /// <see cref="IRasterSource.PixelWidth"/>; declared separately so future
     /// implementations can expose a sub-region without reshaping the CPU mirror.
     /// </summary>
     int GpuPixelWidth => PixelWidth;
