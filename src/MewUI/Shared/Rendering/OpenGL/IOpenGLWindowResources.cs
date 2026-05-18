@@ -6,8 +6,6 @@ internal interface IOpenGLWindowResources : IDisposable
 
     bool SupportsNpotTextures { get; }
 
-    //OpenGLTextCache TextCache { get; }
-
     void TrackTexture(uint textureId);
 
     void MakeCurrent(nint deviceOrDisplay);

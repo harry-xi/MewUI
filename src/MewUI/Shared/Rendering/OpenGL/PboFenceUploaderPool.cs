@@ -105,13 +105,12 @@ internal sealed class PboFenceUploaderPool : IDisposable
 }
 
 /// <summary>
-/// Thin <see cref="IExternalLockedTexture"/> wrapper that returns its inner
+/// Thin <see cref="IExternalRasterSource"/> wrapper that returns its inner
 /// <see cref="PboFenceUploader"/> to a pool on <see cref="Dispose"/> instead of
 /// destroying the underlying GL resources. Used by the factory so that an
-/// <see cref="MewVG.MewVGExternalLockedImage"/> with <c>ownsTexture: true</c>
-/// transparently routes the disposal to the pool.
+/// external raster image transparently routes the disposal to the pool.
 /// </summary>
-internal sealed class PooledPboTexture : IExternalLockedTexture
+internal sealed class PooledPboTexture : IExternalRasterSource
 {
     private PboFenceUploader? _inner;
     private readonly PboFenceUploaderPool _pool;
@@ -122,19 +121,33 @@ internal sealed class PooledPboTexture : IExternalLockedTexture
         _pool = pool;
     }
 
-    public nint NativeHandle => _inner?.NativeHandle ?? 0;
     public int PixelWidth => _inner?.PixelWidth ?? 0;
     public int PixelHeight => _inner?.PixelHeight ?? 0;
+    public int Version => _inner?.Version ?? 0;
+    public RenderPixelFormat Format => _inner?.Format ?? RenderPixelFormat.Bgra8888;
     public BitmapAlphaMode AlphaMode => _inner?.AlphaMode ?? BitmapAlphaMode.Ignore;
     public bool YFlipped => _inner?.YFlipped ?? false;
+    public SurfaceCapabilities Capabilities => _inner?.Capabilities ?? SurfaceCapabilities.None;
+    public IReadOnlyList<ExternalRasterPlane> Planes => _inner?.Planes ?? Array.Empty<ExternalRasterPlane>();
 
-    public void Acquire() => _inner?.Acquire();
-    public void Release() => _inner?.Release();
+    public IExternalRasterLease Acquire()
+        => _inner?.Acquire() ?? EmptyRasterLease.Instance;
 
     public void Dispose()
     {
         if (_inner is null) return;
         _pool.Return(_inner);
         _inner = null;
+    }
+
+    private sealed class EmptyRasterLease : IExternalRasterLease
+    {
+        public static readonly EmptyRasterLease Instance = new();
+        public int PixelWidth => 0;
+        public int PixelHeight => 0;
+        public bool YFlipped => false;
+        public nint NativeHandle => 0;
+        public nint NativeAlternateHandle => 0;
+        public void Dispose() { }
     }
 }
