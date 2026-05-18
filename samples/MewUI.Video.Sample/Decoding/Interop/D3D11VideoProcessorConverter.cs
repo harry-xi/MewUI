@@ -161,7 +161,6 @@ internal sealed unsafe class D3D11VideoProcessorConverter : IDisposable
             }
 
             D3D11Native.FlushDeviceContext(_deviceContext);
-
             success = true;
             return true;
         }

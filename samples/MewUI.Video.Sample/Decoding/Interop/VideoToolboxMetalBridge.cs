@@ -1,6 +1,7 @@
 using System.Runtime.InteropServices;
 
 using Aprillz.MewUI.Resources;
+using Aprillz.MewUI.Rendering;
 using Aprillz.MewUI.Video.Sample.Diagnostics;
 
 namespace Aprillz.MewUI.Video.Sample.Decoding;
@@ -25,6 +26,18 @@ internal sealed class VideoToolboxMetalBridge : IDisposable
     private readonly nint _metalDevice;
     private bool _disposed;
     private bool _transferSessionLogged;
+
+    // BGRA destination-buffer pool — concurrent because Rent runs on the decoder thread
+    // (FFmpeg/VT) and Return runs on the render thread (FrameTexture.Dispose during
+    // PresentFrame). Plain Queue<T> races and produced intermittent stutter.
+    private readonly System.Collections.Concurrent.ConcurrentQueue<nint> _bgraPool = new();
+    private int _pooledWidth;
+    private int _pooledHeight;
+    // Pool capacity tuned to cover concurrent frame ownership: decode-in-flight,
+    // queued-for-render, currently-presenting, plus one slack frame for IImage dispose
+    // running behind. 3 was too tight on 4K 60 → render 120 fps mismatch and caused
+    // periodic fallback to fresh CreateIoSurfaceBackedBgraBuffer allocations (~33 MB each).
+    private const int BgraPoolCapacity = 6;
 
     public nint MetalDevice => _metalDevice;
 
@@ -193,7 +206,7 @@ internal sealed class VideoToolboxMetalBridge : IDisposable
         nuint width = CoreVideoInterop.CVPixelBufferGetWidth(cvPixelBuffer);
         nuint height = CoreVideoInterop.CVPixelBufferGetHeight(cvPixelBuffer);
 
-        nint destBuffer = CreateIoSurfaceBackedBgraBuffer(width, height);
+        nint destBuffer = RentBgraDestBuffer(width, height);
         if (destBuffer == 0)
         {
             return null;
@@ -206,7 +219,7 @@ internal sealed class VideoToolboxMetalBridge : IDisposable
             if (xferStatus != 0)
             {
                 SampleLog.Write($"VTPixelTransferSessionTransferImage failed (status {xferStatus}).");
-                CoreVideoInterop.CVPixelBufferRelease(destBuffer);
+                ReturnBgraDestBuffer(destBuffer);
                 return null;
             }
 
@@ -224,7 +237,7 @@ internal sealed class VideoToolboxMetalBridge : IDisposable
             if (wrapStatus != 0 || cvMetalTexture == 0)
             {
                 SampleLog.Write($"CVMetalTextureCacheCreateTextureFromImage(post-transfer BGRA) failed (status {wrapStatus}).");
-                CoreVideoInterop.CVPixelBufferRelease(destBuffer);
+                ReturnBgraDestBuffer(destBuffer);
                 return null;
             }
 
@@ -232,24 +245,71 @@ internal sealed class VideoToolboxMetalBridge : IDisposable
             if (mtlTexture == 0)
             {
                 CoreVideoInterop.CFRelease(cvMetalTexture);
-                CoreVideoInterop.CVPixelBufferRelease(destBuffer);
+                ReturnBgraDestBuffer(destBuffer);
                 return null;
             }
 
-            // destBuffer is owned by this wrapper now (we did the create, we hold the
-            // sole retain); no extra retain needed.
+            // Pool-returned destBuffer: the FrameTexture borrows it for the wrap lifetime.
+            // Its Dispose calls back into ReturnBgraDestBuffer instead of releasing — keeps
+            // the IOSurface alive for the next frame's transfer.
             return new VideoToolboxFrameTexture(
                 cvMetalTexture: cvMetalTexture,
                 cvPixelBuffer: destBuffer,
                 mtlTexture: mtlTexture,
                 mtlDevice: _metalDevice,
                 (int)width,
-                (int)height);
+                (int)height,
+                pixelBufferReleaseCallback: ReturnBgraDestBuffer);
         }
         catch
         {
-            CoreVideoInterop.CVPixelBufferRelease(destBuffer);
+            ReturnBgraDestBuffer(destBuffer);
             throw;
+        }
+    }
+
+    private nint RentBgraDestBuffer(nuint width, nuint height)
+    {
+        int w = (int)width;
+        int h = (int)height;
+        if (_pooledWidth != w || _pooledHeight != h)
+        {
+            DrainBgraPool();
+            _pooledWidth = w;
+            _pooledHeight = h;
+            // Prewarm: pay the IOSurface alloc cost up front (one batch on the first frame
+            // of a stream) instead of letting the first ~6 frames fall through to
+            // CreateIoSurfaceBackedBgraBuffer one-by-one and stutter the playback start.
+            for (int i = 0; i < BgraPoolCapacity; i++)
+            {
+                nint pre = CreateIoSurfaceBackedBgraBuffer(width, height);
+                if (pre == 0) break;
+                _bgraPool.Enqueue(pre);
+            }
+        }
+        if (_bgraPool.TryDequeue(out var buffer))
+        {
+            return buffer;
+        }
+        return CreateIoSurfaceBackedBgraBuffer(width, height);
+    }
+
+    private void ReturnBgraDestBuffer(nint buffer)
+    {
+        if (buffer == 0) return;
+        if (_disposed || _bgraPool.Count >= BgraPoolCapacity)
+        {
+            CoreVideoInterop.CVPixelBufferRelease(buffer);
+            return;
+        }
+        _bgraPool.Enqueue(buffer);
+    }
+
+    private void DrainBgraPool()
+    {
+        while (_bgraPool.TryDequeue(out var buffer))
+        {
+            CoreVideoInterop.CVPixelBufferRelease(buffer);
         }
     }
 
@@ -312,6 +372,8 @@ internal sealed class VideoToolboxMetalBridge : IDisposable
         if (_disposed) return;
         _disposed = true;
 
+        DrainBgraPool();
+
         if (_pixelTransferSession != 0)
         {
             CoreVideoInterop.CFRelease(_pixelTransferSession);
@@ -349,7 +411,7 @@ internal sealed class VideoToolboxMetalBridge : IDisposable
 
 /// <summary>
 /// One frame's worth of CoreVideo→Metal wrapper state. Implements
-/// <see cref="IExternalLockedTexture"/> so the render device's external sample path
+/// <see cref="IExternalRasterSource"/> so the render device's external raster path
 /// can wrap the underlying MTLTexture as an
 /// <c>IImage</c> with NoDelete semantics — zero-copy display from VideoToolbox decode
 /// to NanoVG sampling.
@@ -368,7 +430,7 @@ internal sealed class VideoToolboxMetalBridge : IDisposable
 /// construction onward (no fence to wait, no software lock to take). The lifetime is
 /// pinned by <c>_cvMetalTexture</c> and the explicit CVPixelBuffer retain.
 /// </remarks>
-public sealed class VideoToolboxFrameTexture : IExternalLockedTexture
+public sealed class VideoToolboxFrameTexture : IExternalRasterSource, IGpuResourceAffinityProvider
 {
     private nint _cvMetalTexture;
     private nint _cvPixelBuffer;
@@ -376,16 +438,35 @@ public sealed class VideoToolboxFrameTexture : IExternalLockedTexture
     private nint _mtlDevice;
     private bool _disposed;
 
+    // When set, Dispose hands _cvPixelBuffer back to the owner's pool instead of releasing
+    // it. Used by the NV12 → BGRA transfer path so destination IOSurface buffers are
+    // recycled across frames.
+    private readonly Action<nint>? _pixelBufferReleaseCallback;
+
     public nint MtlTexture => _mtlTexture;
     public nint MtlDevice => _mtlDevice;
 
-    public nint NativeHandle => _disposed ? 0 : _mtlTexture;
     public int PixelWidth { get; }
     public int PixelHeight { get; }
+    public int Version => 0;
+    public RenderPixelFormat Format => RenderPixelFormat.Bgra8888;
     public BitmapAlphaMode AlphaMode => BitmapAlphaMode.Ignore;
     public bool YFlipped => false;
+    public GpuResourceAffinity? Affinity =>
+        _mtlDevice == 0
+            ? null
+            : new GpuResourceAffinity(Display: null, new GpuDeviceIdentity((ulong)_mtlDevice, 0, _mtlDevice));
+    public SurfaceCapabilities Capabilities =>
+        SurfaceCapabilities.ExternalHandle |
+        SurfaceCapabilities.ExternallySynchronized |
+        SurfaceCapabilities.GpuSampleable;
+    public IReadOnlyList<ExternalRasterPlane> Planes =>
+    [
+        new ExternalRasterPlane(0, _disposed ? 0 : _mtlTexture, PixelWidth, PixelHeight, 0, Format)
+    ];
 
-    internal VideoToolboxFrameTexture(nint cvMetalTexture, nint cvPixelBuffer, nint mtlTexture, nint mtlDevice, int width, int height)
+    internal VideoToolboxFrameTexture(nint cvMetalTexture, nint cvPixelBuffer, nint mtlTexture, nint mtlDevice, int width, int height,
+        Action<nint>? pixelBufferReleaseCallback = null)
     {
         _cvMetalTexture = cvMetalTexture;
         _cvPixelBuffer = cvPixelBuffer;
@@ -393,11 +474,11 @@ public sealed class VideoToolboxFrameTexture : IExternalLockedTexture
         _mtlDevice = mtlDevice;
         PixelWidth = width;
         PixelHeight = height;
+        _pixelBufferReleaseCallback = pixelBufferReleaseCallback;
     }
 
-    public void Acquire() { /* no-op — IOSurface is always GPU-resident while CVMetalTexture lives */ }
-
-    public void Release() { /* no-op */ }
+    public IExternalRasterLease Acquire()
+        => new MetalLease(this);
 
     public void Dispose()
     {
@@ -412,11 +493,36 @@ public sealed class VideoToolboxFrameTexture : IExternalLockedTexture
 
         if (_cvPixelBuffer != 0)
         {
-            CoreVideoInterop.CVPixelBufferRelease(_cvPixelBuffer);
+            if (_pixelBufferReleaseCallback is not null)
+            {
+                _pixelBufferReleaseCallback(_cvPixelBuffer);
+            }
+            else
+            {
+                CoreVideoInterop.CVPixelBufferRelease(_cvPixelBuffer);
+            }
             _cvPixelBuffer = 0;
         }
 
         _mtlTexture = 0;
         _mtlDevice = 0;
+    }
+
+    private sealed class MetalLease : IExternalRasterLease, IGpuResourceAffinityProvider
+    {
+        private readonly VideoToolboxFrameTexture _source;
+
+        public MetalLease(VideoToolboxFrameTexture source)
+        {
+            _source = source;
+        }
+
+        public nint NativeHandle => _source._disposed ? 0 : _source._mtlTexture;
+        public nint NativeAlternateHandle => 0;
+        public int PixelWidth => _source.PixelWidth;
+        public int PixelHeight => _source.PixelHeight;
+        public bool YFlipped => _source.YFlipped;
+        public GpuResourceAffinity? Affinity => _source.Affinity;
+        public void Dispose() { }
     }
 }

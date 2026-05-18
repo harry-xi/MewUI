@@ -41,7 +41,9 @@ internal static unsafe class D3D11Native
     //   [3..6]   ID3D11DeviceChild: GetDevice, GetPrivateData, SetPrivateData, SetPrivateDataInterface
     //   [7..9]   ID3D11Resource: GetType, SetEvictionPriority, GetEvictionPriority
     //   [10]     ID3D11Texture2D::GetDesc
+    private const int VTBL_GETDEVICE_INDEX = 3;
     private const int VTBL_GETDESC_INDEX = 10;
+    private const int ContextFlushIndex = 111;
 
     private static readonly Guid IID_ID3D11Multithread = new("9B7E4E00-342C-4106-A19F-4F2704F689F0");
     private static readonly Guid IID_IDXGIDevice = new("54EC77FA-1377-44E6-8C32-88FD5F44C84C");
@@ -64,6 +66,23 @@ internal static unsafe class D3D11Native
         getDesc(texture, &local);
         desc = local;
         return true;
+    }
+
+    /// <summary>
+    /// Calls <c>ID3D11DeviceChild::GetDevice</c> on a texture. The returned device is
+    /// AddRef'ed by D3D11; callers must release it.
+    /// </summary>
+    public static bool TryGetTextureDevice(nint texture, out nint device)
+    {
+        device = 0;
+        if (texture == 0) return false;
+
+        var vtbl = *(nint**)texture;
+        var getDevice = (delegate* unmanaged[Stdcall]<nint, nint*, void>)vtbl[VTBL_GETDEVICE_INDEX];
+        nint local;
+        getDevice(texture, &local);
+        device = local;
+        return local != 0;
     }
 
     /// <summary>
@@ -146,7 +165,7 @@ internal static unsafe class D3D11Native
         }
 
         var vtbl = *(nint**)deviceContext;
-        var flush = (delegate* unmanaged[Stdcall]<nint, void>)vtbl[111];
+        var flush = (delegate* unmanaged[Stdcall]<nint, void>)vtbl[ContextFlushIndex];
         flush(deviceContext);
     }
 
@@ -213,6 +232,60 @@ internal static unsafe class D3D11Native
         }
     }
 
+    public static bool TryGetAdapterLuid(nint d3d11Device, out ulong lowPart, out long highPart)
+    {
+        lowPart = 0;
+        highPart = 0;
+
+        if (d3d11Device == 0)
+        {
+            return false;
+        }
+
+        nint dxgiDevice = 0;
+        nint adapter = 0;
+
+        try
+        {
+            Guid dxgiDeviceId = IID_IDXGIDevice;
+            if (Marshal.QueryInterface(d3d11Device, in dxgiDeviceId, out dxgiDevice) < 0 || dxgiDevice == 0)
+            {
+                return false;
+            }
+
+            var dxgiDeviceVtable = *(nint**)dxgiDevice;
+            var getAdapter = (delegate* unmanaged[Stdcall]<nint, nint*, int>)dxgiDeviceVtable[7];
+            if (getAdapter(dxgiDevice, &adapter) < 0 || adapter == 0)
+            {
+                return false;
+            }
+
+            var adapterVtable = *(nint**)adapter;
+            var getDesc = (delegate* unmanaged[Stdcall]<nint, DXGI_ADAPTER_DESC*, int>)adapterVtable[8];
+            DXGI_ADAPTER_DESC desc;
+            if (getDesc(adapter, &desc) < 0)
+            {
+                return false;
+            }
+
+            lowPart = desc.AdapterLuid.LowPart;
+            highPart = desc.AdapterLuid.HighPart;
+            return true;
+        }
+        finally
+        {
+            if (adapter != 0)
+            {
+                Marshal.Release(adapter);
+            }
+
+            if (dxgiDevice != 0)
+            {
+                Marshal.Release(dxgiDevice);
+            }
+        }
+    }
+
     [StructLayout(LayoutKind.Sequential)]
     public struct DXGI_QUERY_VIDEO_MEMORY_INFO
     {
@@ -237,5 +310,26 @@ internal static unsafe class D3D11Native
         public uint BindFlags;         // D3D11_BIND_FLAG
         public uint CPUAccessFlags;    // D3D11_CPU_ACCESS_FLAG
         public uint MiscFlags;         // D3D11_RESOURCE_MISC_FLAG
+    }
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    private unsafe struct DXGI_ADAPTER_DESC
+    {
+        public fixed char Description[128];
+        public uint VendorId;
+        public uint DeviceId;
+        public uint SubSysId;
+        public uint Revision;
+        public nuint DedicatedVideoMemory;
+        public nuint DedicatedSystemMemory;
+        public nuint SharedSystemMemory;
+        public LUID AdapterLuid;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private readonly struct LUID
+    {
+        public readonly uint LowPart;
+        public readonly int HighPart;
     }
 }

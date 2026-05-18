@@ -26,6 +26,7 @@ public sealed unsafe class VideoDecoder : IDisposable
     private bool _hasMinimumOutputPts;
     private TimeSpan _minimumOutputPts;
     private AVPixelFormat _hardwarePixelFormat = AVPixelFormat.AV_PIX_FMT_NONE;
+    private AVHWDeviceType _activeHardwareDeviceType = AVHWDeviceType.AV_HWDEVICE_TYPE_NONE;
     private D3D11VideoProcessorConverter? _hardwareTextureConverter;
     private bool _hardwareTextureConverterInitTried;
     private bool _hardwareTextureConverterAvailable;
@@ -118,7 +119,8 @@ public sealed unsafe class VideoDecoder : IDisposable
             // via dma_buf. The filter is opaque (graph alloc / parsed config) so
             // failure just falls through to the existing CPU path. The VideoView
             // catches the missing GpuResource and samples from the decoded pixel buffer.
-            if (OperatingSystem.IsLinux() && _hardwareDecodeEnabled)
+            if (OperatingSystem.IsLinux() && _hardwareDecodeEnabled
+                && _activeHardwareDeviceType == AVHWDeviceType.AV_HWDEVICE_TYPE_VAAPI)
             {
                 TryInitVaapiFilterGraph();
             }
@@ -229,14 +231,12 @@ public sealed unsafe class VideoDecoder : IDisposable
                             exportedViaGpuConverter = true;
                         }
                     }
-                    else if (OperatingSystem.IsLinux())
+                    else if (OperatingSystem.IsLinux() && _activeHardwareDeviceType == AVHWDeviceType.AV_HWDEVICE_TYPE_VAAPI)
                     {
                         // VAAPI path: push the decoded NV12 surface through the
                         // scale_vaapi filter so the surface we hand off is already
-                        // BGRA. The filter reuses the same VADisplay, so the output
-                        // surface is dma_buf-exportable on the same device. Falls
-                        // through to CPU upload if the filter graph isn't ready
-                        // (first-frame init) or if VPP fails on the driver.
+                        // BGRA. CUDA/NVDEC frames skip this and fall through to
+                        // av_hwframe_transfer_data + sws (NV12→BGRA on CPU).
                         AVFrame* outFrame = ProcessVaapiFilter(_frame);
                         if (outFrame is not null)
                         {
@@ -253,6 +253,7 @@ public sealed unsafe class VideoDecoder : IDisposable
                     else if (TryConvertHardwareFrameForInterop(_frame, out nint convertedHandle, out int convertedSubresource))
                     {
                         gpuResource = new D3D11GpuResource(convertedHandle, convertedSubresource, D3D11Device, ReturnConvertedTexture);
+                        ((D3D11GpuResource)gpuResource).SetRasterSize(Width, Height);
                         exportedViaGpuConverter = true;
                     }
                 }
@@ -260,14 +261,16 @@ public sealed unsafe class VideoDecoder : IDisposable
 
                 if (!exportedViaGpuConverter)
                 {
-                    if (!forceCpuReadback)
+                    if (!forceCpuReadback && _activeHardwareDeviceType == AVHWDeviceType.AV_HWDEVICE_TYPE_D3D11VA)
                     {
+                        // D3D11VA-only: data[0] is an ID3D11Texture2D* (COM). For CUDA/
+                        // VAAPI/VideoToolbox it's a device pointer or opaque handle —
+                        // calling Marshal.AddRef on those segfaults.
                         CaptureHardwareFrameMetadata(hwFrameForExport, out nint rawHandle, out int rawSubresource, out bool rawHardwareDecoded);
                         if (rawHardwareDecoded && rawHandle != 0)
                         {
-                            // Raw decoder surface exposed alongside CPU pixels so the display
-                            // side can still attempt zero-copy (WGL interop, D2D shared bitmap).
                             gpuResource = new D3D11GpuResource(rawHandle, rawSubresource, D3D11Device, static handle => Marshal.Release(handle));
+                            ((D3D11GpuResource)gpuResource).SetRasterSize(Width, Height);
                         }
                     }
 
@@ -422,10 +425,10 @@ public sealed unsafe class VideoDecoder : IDisposable
             _vaapiFilterSink = null;
         }
 
-        _hardwareTextureConverter?.Dispose();
-        _hardwareTextureConverter = null;
         _videoToolboxBridge?.Dispose();
         _videoToolboxBridge = null;
+        _hardwareTextureConverter?.Dispose();
+        _hardwareTextureConverter = null;
 
         if (_codec is not null)
         {
@@ -489,14 +492,21 @@ public sealed unsafe class VideoDecoder : IDisposable
             .Append(" / ")
             .Append(FormatDouble(RationalToDouble(_streamFrameRate)));
 
-        string hwLabel = OperatingSystem.IsMacOS() ? "videotoolbox" : "d3d11";
+        string hwLabel = _activeHardwareDeviceType switch
+        {
+            AVHWDeviceType.AV_HWDEVICE_TYPE_VIDEOTOOLBOX => "videotoolbox",
+            AVHWDeviceType.AV_HWDEVICE_TYPE_VAAPI => "vaapi",
+            AVHWDeviceType.AV_HWDEVICE_TYPE_CUDA => "nvdec",
+            AVHWDeviceType.AV_HWDEVICE_TYPE_D3D11VA => "d3d11",
+            _ => OperatingSystem.IsMacOS() ? "videotoolbox" : "d3d11",
+        };
         builder.Append("\ndecode: ").Append(_lastDecodeWasHardwareBacked ? hwLabel : "software");
         builder.Append("\nframe fmt: ").Append(_lastFrameFormat);
         builder.Append("\ncodec fmt: ").Append(_codec->pix_fmt);
         builder.Append("\nhw pix fmt: ").Append(_hardwarePixelFormat);
         builder.Append("\nhw ctx: ").Append(_hardwareDeviceContext != null ? "set" : "null");
         builder.Append("\ninterop convert: ").Append(_lastExportedViaGpuConverter ? "gpu" : "fallback");
-        builder.Append("\nconverter: ").Append(_hardwareTextureConverterAvailable ? "ready" : (_hardwareTextureConverterInitTried ? "unavailable" : "pending"));
+        builder.Append("\nconverter: display-owned");
         builder.Append("\ncpu readback policy: ").Append(_forceCpuReadback ? "forced" : "allowed");
         return builder.ToString();
     }
@@ -525,15 +535,10 @@ public sealed unsafe class VideoDecoder : IDisposable
         set => _forceCpuReadback = value;
     }
 
-    private void ReturnConvertedTexture(nint texture)
-    {
-        _hardwareTextureConverter?.ReturnOutputTexture(texture);
-    }
-
     /// <summary>
     /// macOS zero-copy path: wraps a VideoToolbox-decoded AVFrame's CVPixelBuffer as a
     /// disposable <see cref="VideoToolboxFrameTexture"/> (which exposes both an
-    /// <c>MTLTexture</c> handle and the <see cref="IExternalLockedTexture"/> contract
+    /// <c>MTLTexture</c> handle and the <see cref="IExternalRasterSource"/> contract
     /// MewVG Metal needs for NoDelete-style sampling).
     /// </summary>
     /// <remarks>
@@ -598,14 +603,9 @@ public sealed unsafe class VideoDecoder : IDisposable
         {
             _hardwareTextureConverterInitTried = true;
             _hardwareTextureConverterAvailable = D3D11VideoProcessorConverter.TryCreate(D3D11Device, out _hardwareTextureConverter);
-            if (_hardwareTextureConverterAvailable)
-            {
-                SampleLog.Write("D3D11 video processor interop converter initialised.");
-            }
-            else
-            {
-                SampleLog.Write("D3D11 video processor interop converter unavailable; exposing decoder surface directly.");
-            }
+            SampleLog.Write(_hardwareTextureConverterAvailable
+                ? "D3D11 video processor interop converter initialised."
+                : "D3D11 video processor interop converter unavailable; exposing decoder surface directly.");
         }
 
         if (!_hardwareTextureConverterAvailable || _hardwareTextureConverter is null)
@@ -623,6 +623,9 @@ public sealed unsafe class VideoDecoder : IDisposable
         return true;
     }
 
+    private void ReturnConvertedTexture(nint texture)
+        => _hardwareTextureConverter?.ReturnOutputTexture(texture);
+
     private void TryEnableHardwareDecode(AVCodec* codec)
     {
         if (OperatingSystem.IsMacOS())
@@ -634,6 +637,10 @@ public sealed unsafe class VideoDecoder : IDisposable
         if (OperatingSystem.IsLinux())
         {
             TryEnableVaapiDecode(codec);
+            if (!_hardwareDecodeEnabled)
+            {
+                TryEnableCudaDecode(codec);
+            }
             return;
         }
 
@@ -660,6 +667,10 @@ public sealed unsafe class VideoDecoder : IDisposable
         {
             _hardwareDeviceContext = ffmpeg.av_buffer_ref(_codec->hw_device_ctx);
             _hardwareDecodeEnabled = _hardwareDeviceContext is not null;
+            if (_hardwareDecodeEnabled)
+            {
+                _activeHardwareDeviceType = AVHWDeviceType.AV_HWDEVICE_TYPE_D3D11VA;
+            }
             SampleLog.Write($"D3D11VA configured with interop-ready device. hw_pix_fmt={_hardwarePixelFormat}");
             return;
         }
@@ -673,6 +684,10 @@ public sealed unsafe class VideoDecoder : IDisposable
 
         _hardwareDeviceContext = ffmpeg.av_buffer_ref(_codec->hw_device_ctx);
         _hardwareDecodeEnabled = _hardwareDeviceContext is not null;
+        if (_hardwareDecodeEnabled)
+        {
+            _activeHardwareDeviceType = AVHWDeviceType.AV_HWDEVICE_TYPE_D3D11VA;
+        }
         SampleLog.Write($"D3D11VA configured with FFmpeg default device. hw_pix_fmt={_hardwarePixelFormat}");
     }
 
@@ -714,6 +729,10 @@ public sealed unsafe class VideoDecoder : IDisposable
 
         _hardwareDeviceContext = ffmpeg.av_buffer_ref(_codec->hw_device_ctx);
         _hardwareDecodeEnabled = _hardwareDeviceContext is not null;
+        if (_hardwareDecodeEnabled)
+        {
+            _activeHardwareDeviceType = AVHWDeviceType.AV_HWDEVICE_TYPE_VIDEOTOOLBOX;
+        }
 
         // Pre-create hw_frames_ctx with sw_format=BGRA so VideoToolbox is configured to
         // emit single-plane BGRA8 CVPixelBuffers. Default would be NV12 (two-plane YUV),
@@ -766,8 +785,51 @@ public sealed unsafe class VideoDecoder : IDisposable
 
         _hardwareDeviceContext = ffmpeg.av_buffer_ref(_codec->hw_device_ctx);
         _hardwareDecodeEnabled = _hardwareDeviceContext is not null;
+        if (_hardwareDecodeEnabled)
+        {
+            _activeHardwareDeviceType = AVHWDeviceType.AV_HWDEVICE_TYPE_VAAPI;
+        }
 
         SampleLog.Write($"VA-API configured. hw_pix_fmt={_hardwarePixelFormat}");
+    }
+
+    /// <summary>
+    /// Linux NVDEC path. Used when VA-API is unavailable (WSL, NVIDIA proprietary
+    /// driver without libnvidia-vaapi-driver, etc.). NVDEC decodes into a CUDA
+    /// device surface (AV_PIX_FMT_CUDA); we let av_hwframe_transfer_data copy it
+    /// to NV12 in system memory and the existing sws path converts to BGRA.
+    /// </summary>
+    private void TryEnableCudaDecode(AVCodec* codec)
+    {
+        var hardwareConfig = FindHardwareConfig(codec, AVHWDeviceType.AV_HWDEVICE_TYPE_CUDA);
+        if (hardwareConfig is null)
+        {
+            SampleLog.Write("CUDA/NVDEC hardware decode not available for this codec.");
+            return;
+        }
+
+        _hardwarePixelFormat = hardwareConfig->pix_fmt;
+
+        int createResult = ffmpeg.av_hwdevice_ctx_create(
+            &_codec->hw_device_ctx,
+            AVHWDeviceType.AV_HWDEVICE_TYPE_CUDA,
+            null,
+            null,
+            0);
+        if (createResult < 0 || _codec->hw_device_ctx is null)
+        {
+            SampleLog.Write($"CUDA device creation failed: {FormatError(createResult)}. Falling back to software decode.");
+            return;
+        }
+
+        _hardwareDeviceContext = ffmpeg.av_buffer_ref(_codec->hw_device_ctx);
+        _hardwareDecodeEnabled = _hardwareDeviceContext is not null;
+        if (_hardwareDecodeEnabled)
+        {
+            _activeHardwareDeviceType = AVHWDeviceType.AV_HWDEVICE_TYPE_CUDA;
+        }
+
+        SampleLog.Write($"CUDA/NVDEC configured. hw_pix_fmt={_hardwarePixelFormat}");
     }
 
     /// <summary>
@@ -1140,7 +1202,14 @@ public sealed unsafe class VideoDecoder : IDisposable
         }
 
         SampleLog.Write($"HW decode configs exposed by codec: {string.Join("; ", hardwareConfigs)}");
-        string deviceLabel = OperatingSystem.IsMacOS() ? "videotoolbox" : "d3d11va";
+        string deviceLabel = _activeHardwareDeviceType switch
+        {
+            AVHWDeviceType.AV_HWDEVICE_TYPE_VIDEOTOOLBOX => "videotoolbox",
+            AVHWDeviceType.AV_HWDEVICE_TYPE_VAAPI => "vaapi",
+            AVHWDeviceType.AV_HWDEVICE_TYPE_CUDA => "cuda/nvdec",
+            AVHWDeviceType.AV_HWDEVICE_TYPE_D3D11VA => "d3d11va",
+            _ => "unknown",
+        };
         SampleLog.Write($"HW decode active at open: {_hardwareDecodeEnabled} ({(_hardwareDecodeEnabled ? $"device={deviceLabel}, hw_pix_fmt={_hardwarePixelFormat}" : "no hw_device_ctx configured")}). codecPixFmt={_codec->pix_fmt}");
     }
 
@@ -1193,7 +1262,7 @@ public sealed unsafe class VideoDecoder : IDisposable
     {
         d3d11TextureHandle = 0;
         d3d11SubresourceIndex = 0;
-        hardwareDecoded = false;
+        hardwareDecoded = false;    
 
         bool isHardwareFrame = decodedFrame->hw_frames_ctx is not null || (_hardwareDecodeEnabled && (AVPixelFormat)decodedFrame->format == _hardwarePixelFormat);
         if (!isHardwareFrame)

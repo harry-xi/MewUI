@@ -1,12 +1,13 @@
 using System.Runtime.InteropServices;
 
 using Aprillz.MewUI.Resources;
+using Aprillz.MewUI.Rendering;
 using Aprillz.MewUI.Video.Sample.Diagnostics;
 
 namespace Aprillz.MewUI.Video.Sample.Decoding;
 
 /// <summary>
-/// Wraps a VA-API decoded surface as an <see cref="IExternalLockedTexture"/> by
+/// Wraps a VA-API decoded surface as an <see cref="IExternalRasterSource"/> by
 /// exporting the surface as a DRM PRIME dma_buf and importing it as an EGLImage
 /// bound to a GL texture. Enables zero-copy sampling of hardware-decoded video on
 /// Linux when running against a Mesa driver (Intel iHD, AMD radeonsi, Nouveau).
@@ -34,7 +35,7 @@ namespace Aprillz.MewUI.Video.Sample.Decoding;
 /// failure.
 /// </para>
 /// </remarks>
-internal sealed unsafe class VaapiDmaBufTexture : IExternalLockedTexture
+internal sealed unsafe class VaapiDmaBufTexture : IExternalRasterSource
 {
     private readonly nint _vaDisplay;
     private readonly uint _vaSurfaceId;
@@ -44,11 +45,20 @@ internal sealed unsafe class VaapiDmaBufTexture : IExternalLockedTexture
     private readonly int[] _ownedFds;
     private bool _disposed;
 
-    public nint NativeHandle => (nint)_glTextureId;
     public int PixelWidth { get; }
     public int PixelHeight { get; }
+    public int Version => 0;
+    public RenderPixelFormat Format => RenderPixelFormat.Bgra8888;
     public BitmapAlphaMode AlphaMode => BitmapAlphaMode.Ignore; // video frames are opaque
     public bool YFlipped => false;                              // dma_buf row 0 = top
+    public SurfaceCapabilities Capabilities =>
+        SurfaceCapabilities.ExternalHandle |
+        SurfaceCapabilities.ExternallySynchronized |
+        SurfaceCapabilities.GpuSampleable;
+    public IReadOnlyList<ExternalRasterPlane> Planes =>
+    [
+        new ExternalRasterPlane(0, (nint)_glTextureId, PixelWidth, PixelHeight, 0, Format)
+    ];
 
     /// <summary>
     /// Imports <paramref name="vaSurfaceId"/> from <paramref name="vaDisplay"/> as a
@@ -229,7 +239,13 @@ internal sealed unsafe class VaapiDmaBufTexture : IExternalLockedTexture
     /// Sync the VA surface so the GPU has finished decoding before the consumer
     /// samples. Cheap on most drivers (no-op when decode is already complete).
     /// </summary>
-    public void Acquire()
+    public IExternalRasterLease Acquire()
+    {
+        SyncSurface();
+        return new GlLease(this);
+    }
+
+    private void SyncSurface()
     {
         if (_disposed) return;
         int status = LibVa.vaSyncSurface(_vaDisplay, _vaSurfaceId);
@@ -239,16 +255,31 @@ internal sealed unsafe class VaapiDmaBufTexture : IExternalLockedTexture
         }
     }
 
-    public void Release()
-    {
-        // dma_buf is always-readable shared memory; nothing to unlock per frame.
-    }
-
     public void Dispose()
     {
         if (_disposed) return;
         _disposed = true;
         CleanupResources();
+    }
+
+    private sealed class GlLease : IExternalRasterLease
+    {
+        private readonly VaapiDmaBufTexture _source;
+
+        public GlLease(VaapiDmaBufTexture source)
+        {
+            _source = source;
+        }
+
+        public nint NativeHandle => (nint)_source._glTextureId;
+        public nint NativeAlternateHandle => 0;
+        public int PixelWidth => _source.PixelWidth;
+        public int PixelHeight => _source.PixelHeight;
+        public bool YFlipped => _source.YFlipped;
+        public void Dispose()
+        {
+            // dma_buf is always-readable shared memory; nothing to unlock per frame.
+        }
     }
 
     private void CleanupResources()

@@ -19,11 +19,13 @@ public sealed class VideoView : FrameworkElement
     // D3D11 texture changes. Null when the path isn't taken (software-decoded frames,
     // non-GL-Win32 backend, driver missing the extension, OS != Windows).
     private WglDxInteropTexture? _interopTexture;
-    private CachedGlInteropEntry? _activeGlInteropEntry;
+    private CachedGlInteropEntry? _activeGLInteropEntry;
+    private IGpuInteropInvalidationSource? _gpuInteropInvalidationSource;
     private bool _interopProbeFailed;   // sticky flag — don't retry per frame after a failed probe
     private VideoFrame? _lastUploadedFrame;
     private long _lastGeneration = -1;
     private bool _firstPresentedFrameLogged;
+    private long _lastGpuInteropInvalidationTicks;
 
     public VideoPlayback? Playback
     {
@@ -58,6 +60,8 @@ public sealed class VideoView : FrameworkElement
     }
 
     public string PresentationPathText => _presentationPathText;
+
+    public event EventHandler<GpuInteropInvalidatedEventArgs>? GpuInteropInvalidated;
 
     /// <summary>
     /// Diagnostic counter — increments each time <see cref="OnRender"/> runs. Externally
@@ -120,6 +124,7 @@ public sealed class VideoView : FrameworkElement
 
     protected override void OnDispose()
     {
+        UnsubscribeGpuInteropInvalidation();
         ReleaseLastFrame();
         if (_playback is not null)
         {
@@ -128,6 +133,67 @@ public sealed class VideoView : FrameworkElement
         _image?.Dispose();
         _image = null;
         base.OnDispose();
+    }
+
+    protected override void OnVisualRootChanged(Element? oldRoot, Element? newRoot)
+    {
+        base.OnVisualRootChanged(oldRoot, newRoot);
+
+        UnsubscribeGpuInteropInvalidation();
+
+        if (newRoot is Window window && window.GraphicsFactory is IGpuInteropInvalidationSource source)
+        {
+            _gpuInteropInvalidationSource = source;
+            source.GpuInteropInvalidated += OnGpuInteropInvalidated;
+        }
+    }
+
+    private void UnsubscribeGpuInteropInvalidation()
+    {
+        if (_gpuInteropInvalidationSource is null)
+        {
+            return;
+        }
+
+        _gpuInteropInvalidationSource.GpuInteropInvalidated -= OnGpuInteropInvalidated;
+        _gpuInteropInvalidationSource = null;
+    }
+
+    private void OnGpuInteropInvalidated(object? sender, GpuInteropInvalidatedEventArgs e)
+    {
+        var dispatcher = Application.IsRunning ? Application.Current.Dispatcher : null;
+        if (dispatcher is not null && !dispatcher.IsOnUIThread)
+        {
+            dispatcher.BeginInvoke(() => OnGpuInteropInvalidated(sender, e));
+            return;
+        }
+
+        if (e.RenderTargetHandle != 0
+            && FindVisualRoot() is Window window
+            && window.Handle != e.RenderTargetHandle)
+        {
+            return;
+        }
+
+        long now = System.Diagnostics.Stopwatch.GetTimestamp();
+        bool mayReleaseCurrentFrame = _lastGpuInteropInvalidationTicks == 0
+            || now - _lastGpuInteropInvalidationTicks >= System.Diagnostics.Stopwatch.Frequency;
+        _lastGpuInteropInvalidationTicks = now;
+
+        if (!mayReleaseCurrentFrame)
+        {
+            return;
+        }
+
+        SampleLog.Write(
+            $"VideoView GPU interop invalidated: reason={e.Reason}, renderTarget=0x{e.RenderTargetHandle:X}, renderTargetDeviceChanged={e.RenderTargetDeviceChanged}, displayChanged={e.DisplayChanged}, externalResourceMismatch={e.ExternalResourceMismatch}");
+
+        _interopProbeFailed = false;
+        ReleaseLastFrame();
+        UpdatePresentationPath("gpu interop invalidated");
+
+        GpuInteropInvalidated?.Invoke(this, e);
+        InvalidateVisual();
     }
 
     private void PresentFrame(VideoFrame frame)
@@ -140,7 +206,7 @@ public sealed class VideoView : FrameworkElement
         var previousFrame = _lastUploadedFrame;
         var previousImage = _image;
         var previousInterop = _interopTexture;
-    var previousGlInteropEntry = _activeGlInteropEntry;
+        var previousGlInteropEntry = _activeGLInteropEntry;
 
         var factory = GetGraphicsFactory();
         IImage? image = TryCreateZeroCopyImage(factory, frame);
@@ -161,13 +227,13 @@ public sealed class VideoView : FrameworkElement
             // we accept while the zero-copy path matures).
             image = factory.CreateImageView(frame);
             _interopTexture = null;
-            _activeGlInteropEntry = null;
+            _activeGLInteropEntry = null;
 
             // Distinguish the two CPU-upload variants in the stats overlay so toggling
-            // the PBO path is visible. The factory returns MewVGExternalLockedImage when
+            // the PBO path is visible. The factory returns MewVGExternalRasterImage when
             // it routed through PboFenceUploader, and MewVGImage otherwise. The concrete
             // types are internal so we match by type name string.
-            string uploadKind = image?.GetType().Name == "MewVGExternalLockedImage"
+            string uploadKind = image?.GetType().Name == "MewVGExternalRasterImage"
                 ? "cpu upload + async PBO+fence"
                 : "cpu upload (sync)";
             UpdatePresentationPath($"{uploadKind} ({factory.Backend})");
@@ -231,11 +297,11 @@ public sealed class VideoView : FrameworkElement
         try
         {
             var texture = new VaapiDmaBufTexture(vaapi.VaDisplay, vaapi.VaSurfaceId, frame.Width, frame.Height);
-            var image = factory.CreateImageView(texture.AsExternalSampleSource(ExternalSampleSourceKind.OpenGLTexture));
+            var image = factory.CreateImageView(texture);
             UpdatePresentationPath("gpu zero-copy (vaapi dma_buf → egl → gl)");
             if (!_firstPresentedFrameLogged)
             {
-                SampleLog.Write($"Zero-copy GPU path active: VAAPI surface {vaapi.VaSurfaceId} exported as dma_buf, bound as GL texture {(uint)texture.NativeHandle}.");
+                SampleLog.Write($"Zero-copy GPU path active: VAAPI surface {vaapi.VaSurfaceId} exported as dma_buf, bound as GL texture {(uint)texture.Planes[0].NativeHandle}.");
             }
             return image;
         }
@@ -250,7 +316,7 @@ public sealed class VideoView : FrameworkElement
     {
         try
         {
-            var image = factory.CreateImageView(vtTexture.AsExternalSampleSource(ExternalSampleSourceKind.MetalTexture));
+            var image = factory.CreateImageView(vtTexture);
             UpdatePresentationPath("gpu zero-copy (videotoolbox iosurface → metal)");
             if (!_firstPresentedFrameLogged)
             {
@@ -276,23 +342,18 @@ public sealed class VideoView : FrameworkElement
         {
             try
             {
-                var image = Direct2DInteropImage.TryCreate(d2dFactory, d3d11.TextureHandle, frame.Width, frame.Height, out var failureReason);
-                if (image is not null)
+                var image = d2dFactory.CreateImageView(d3d11);
+                UpdatePresentationPath("gpu zero-copy (direct2d dxgi)");
+                if (!_firstPresentedFrameLogged)
                 {
-                    UpdatePresentationPath("gpu zero-copy (direct2d dxgi)");
-                    if (!_firstPresentedFrameLogged)
-                    {
-                        SampleLog.Write($"Zero-copy GPU path active: Direct2D shared bitmap wrapping D3D11 texture 0x{d3d11.TextureHandle:X}.");
-                    }
-                    return image;
+                    SampleLog.Write($"Zero-copy GPU path active: Direct2D shared bitmap wrapping D3D11 texture 0x{d3d11.TextureHandle:X}.");
                 }
-
-                SampleLog.Write(
-                    $"Direct2D interop image creation failed; using CPU upload path. reason={failureReason ?? "unknown"}, frameDevice=0x{d3d11.DeviceHandle:X}, factoryDevice=0x{d2dFactory.NativeD3D11Device:X}, texture=0x{d3d11.TextureHandle:X}");
+                return image;
             }
             catch (Exception ex)
             {
-                SampleLog.Write($"Direct2D interop path failed ({ex.Message}); using CPU upload path.");
+                SampleLog.Write(
+                    $"Direct2D external raster path failed ({ex.Message}); using CPU upload path. frameDevice=0x{d3d11.DeviceHandle:X}, factoryDevice=0x{d2dFactory.NativeD3D11Device:X}, texture=0x{d3d11.TextureHandle:X}");
             }
 
             return null;
@@ -319,7 +380,7 @@ public sealed class VideoView : FrameworkElement
         {
             var entry = GetOrCreateCachedGlInteropEntry(factory, d3d11, frame.Width, frame.Height);
             _interopTexture = entry.InteropTexture;
-            _activeGlInteropEntry = entry;
+            _activeGLInteropEntry = entry;
             UpdatePresentationPath("gpu zero-copy (wgl dx interop)");
             if (!_firstPresentedFrameLogged)
             {
@@ -330,7 +391,7 @@ public sealed class VideoView : FrameworkElement
         catch (Exception ex)
         {
             SampleLog.Write($"WGL_NV_DX_interop registration failed ({ex.Message}); switching to CPU readback path.");
-            _activeGlInteropEntry = null;
+            _activeGLInteropEntry = null;
             _interopProbeFailed = true;
             return null;
         }
@@ -338,7 +399,7 @@ public sealed class VideoView : FrameworkElement
 
     private void ReleaseLastFrame()
     {
-        if (_activeGlInteropEntry is null)
+        if (_activeGLInteropEntry is null)
         {
             _image?.Dispose();
             _interopTexture?.Dispose();
@@ -346,7 +407,7 @@ public sealed class VideoView : FrameworkElement
 
         _image = null;
         _interopTexture = null;
-        _activeGlInteropEntry = null;
+        _activeGLInteropEntry = null;
         DisposeGlInteropCache();
 
         if (_lastUploadedFrame is null)
@@ -377,7 +438,7 @@ public sealed class VideoView : FrameworkElement
         }
 
         var interopTexture = new WglDxInteropTexture(d3d11.DeviceHandle, d3d11.TextureHandle, width, height);
-        var image = factory.CreateImageView(interopTexture.AsExternalSampleSource(ExternalSampleSourceKind.OpenGLTexture));
+        var image = factory.CreateImageView(interopTexture);
         cached = new CachedGlInteropEntry(interopTexture, image);
         _glInteropCache.Add(d3d11.TextureHandle, cached);
         return cached;

@@ -11,8 +11,7 @@ public sealed class VideoPlayback : IDisposable
     private static readonly TimeSpan PresentationLead = TimeSpan.FromMilliseconds(8);
     private static readonly TimeSpan LargePresentationErrorThreshold = TimeSpan.FromMilliseconds(8);
 
-    private readonly nint _preferredD3D11Device;
-    private readonly VideoDecoder _decoder;
+    private VideoDecoder _decoder;
     private readonly VideoFrameQueue _queue;
     private readonly PlaybackClock _clock;
     private readonly ConcurrentBag<VideoFrame> _framePool = new();
@@ -20,6 +19,7 @@ public sealed class VideoPlayback : IDisposable
     private readonly AutoResetEvent _stateChanged = new(false);
     private readonly Thread _decodeThread;
     private readonly object _seekGate = new();
+    private readonly object _decoderGate = new();
 
     private bool _isPlaying;
     private bool _seekPending;
@@ -43,7 +43,6 @@ public sealed class VideoPlayback : IDisposable
     public VideoPlayback(string path, nint preferredD3D11Device = 0)
     {
         SampleLog.Write($"VideoPlayback ctor: {path}");
-        _preferredD3D11Device = preferredD3D11Device;
         _decoder = new VideoDecoder(path, preferredD3D11Device);
         _queue = new VideoFrameQueue(capacity: 4);
         _clock = new PlaybackClock();
@@ -60,7 +59,7 @@ public sealed class VideoPlayback : IDisposable
 
     public string SourcePath { get; }
 
-    public TimeSpan Duration => _decoder.Duration;
+    public TimeSpan Duration { get { lock (_decoderGate) return _decoder.Duration; } }
 
     public TimeSpan Position => _clock.Now;
 
@@ -68,15 +67,15 @@ public sealed class VideoPlayback : IDisposable
 
     public bool IsEnded => _eofReached && _queue.Count == 0 && Position >= Duration;
 
-    public int PixelWidth => _decoder.Width;
+    public int PixelWidth { get { lock (_decoderGate) return _decoder.Width; } }
 
-    public int PixelHeight => _decoder.Height;
+    public int PixelHeight { get { lock (_decoderGate) return _decoder.Height; } }
 
-    public string DecoderStatsOverlayText => _decoder.GetStatsOverlayText();
+    public string DecoderStatsOverlayText { get { lock (_decoderGate) return _decoder.GetStatsOverlayText(); } }
 
-    public nint D3D11Device => _decoder.D3D11Device;
+    public nint D3D11Device { get { lock (_decoderGate) return _decoder.D3D11Device; } }
 
-    public nint MetalDevice => _decoder.MetalDevice;
+    public nint MetalDevice { get { lock (_decoderGate) return _decoder.MetalDevice; } }
 
     /// <summary>
     /// Forwards <see cref="VideoDecoder.ForceCpuReadback"/> so the sample UI can
@@ -84,8 +83,8 @@ public sealed class VideoPlayback : IDisposable
     /// </summary>
     public bool ForceCpuReadback
     {
-        get => _decoder.ForceCpuReadback;
-        set => _decoder.ForceCpuReadback = value;
+        get { lock (_decoderGate) return _decoder.ForceCpuReadback; }
+        set { lock (_decoderGate) _decoder.ForceCpuReadback = value; }
     }
 
     public long Generation => Interlocked.Read(ref _generation);
@@ -219,8 +218,45 @@ public sealed class VideoPlayback : IDisposable
         _decodeThread.Join();
         _stateChanged.Dispose();
         _queue.Clear(frame => frame.ResetGpuState());
-        _decoder.Dispose();
+        lock (_decoderGate)
+        {
+            _decoder.Dispose();
+        }
         _cts.Dispose();
+    }
+
+    public void RecreateDecoder(nint preferredD3D11Device, TimeSpan position)
+    {
+        ThrowIfDisposed();
+        SampleLog.Write($"VideoPlayback.RecreateDecoder position={position}");
+
+        var replacement = new VideoDecoder(SourcePath, preferredD3D11Device);
+        if (position > TimeSpan.Zero)
+        {
+            var clampedPosition = replacement.Duration > TimeSpan.Zero && position > replacement.Duration
+                ? replacement.Duration
+                : position;
+            replacement.Seek(clampedPosition);
+            position = clampedPosition;
+        }
+
+        VideoDecoder oldDecoder;
+        lock (_decoderGate)
+        {
+            oldDecoder = _decoder;
+            _decoder = replacement;
+            _queue.Clear(Recycle);
+            _eofReached = false;
+            _firstQueuedFrameLogged = false;
+            _decodeSingleFrameWhilePaused = !_isPlaying;
+            _presentNextFrameAfterPausedSeek = true;
+            Interlocked.Increment(ref _generation);
+        }
+
+        oldDecoder.Dispose();
+        _clock.SeekTo(position);
+        _stateChanged.Set();
+        FrameReady?.Invoke();
     }
 
     private void DecodeLoop()
@@ -237,8 +273,21 @@ public sealed class VideoPlayback : IDisposable
 
             ProcessPendingSeek();
 
+            int decodedWidth;
+            int decodedHeight;
             var frame = RentFrame();
-            if (!_decoder.TryDecodeNext(frame.BgraData, out var pts, out var gpuResource, out var hasCpuPixels))
+            bool decoded;
+            TimeSpan pts;
+            IGpuFrameResource? gpuResource;
+            bool hasCpuPixels;
+            lock (_decoderGate)
+            {
+                decoded = _decoder.TryDecodeNext(frame.BgraData, out pts, out gpuResource, out hasCpuPixels);
+                decodedWidth = _decoder.Width;
+                decodedHeight = _decoder.Height;
+            }
+
+            if (!decoded)
             {
                 Recycle(frame);
                 _eofReached = true;
@@ -248,8 +297,8 @@ public sealed class VideoPlayback : IDisposable
             }
 
             frame.Pts = pts;
-            frame.Width = _decoder.Width;
-            frame.Height = _decoder.Height;
+            frame.Width = decodedWidth;
+            frame.Height = decodedHeight;
             frame.ResetGpuState();
             frame.HasCpuPixels = hasCpuPixels;
             frame.GpuResource = gpuResource;
@@ -296,14 +345,25 @@ public sealed class VideoPlayback : IDisposable
             _seekPending = false;
         }
 
-        _decoder.Seek(target);
+        lock (_decoderGate)
+        {
+            _decoder.Seek(target);
+        }
         _queue.Clear(Recycle);
         _eofReached = false;
     }
 
     private VideoFrame RentFrame()
     {
-        int requiredBytes = checked(_decoder.Width * _decoder.Height * 4);
+        int requiredBytes;
+        int width;
+        int height;
+        lock (_decoderGate)
+        {
+            width = _decoder.Width;
+            height = _decoder.Height;
+            requiredBytes = checked(width * height * 4);
+        }
         if (_framePool.TryTake(out var frame))
         {
             frame.ResetGpuState();
@@ -318,8 +378,8 @@ public sealed class VideoPlayback : IDisposable
         return new VideoFrame
         {
             BgraData = new byte[requiredBytes],
-            Width = _decoder.Width,
-            Height = _decoder.Height
+            Width = width,
+            Height = height
         };
     }
 
@@ -335,7 +395,10 @@ public sealed class VideoPlayback : IDisposable
             return;
         }
 
-        _decoder.EnableCpuReadbackFallback();
+        lock (_decoderGate)
+        {
+            _decoder.EnableCpuReadbackFallback();
+        }
         _queue.Clear(Recycle);
 
         if (!_isPlaying)
