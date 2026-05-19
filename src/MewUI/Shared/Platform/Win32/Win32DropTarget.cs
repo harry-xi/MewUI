@@ -94,7 +94,7 @@ internal static unsafe class Win32DropTarget
         return handle.IsAllocated ? handle.Target as Win32DropTargetAdapter : null;
     }
 
-    [UnmanagedCallersOnly(CallConvs = new[] { typeof(System.Runtime.CompilerServices.CallConvStdcall) })]
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvStdcall) })]
     private static int QueryInterface(nint pThis, Guid* riid, nint* ppvObject)
     {
         if (riid == null || ppvObject == null) return Ole32.E_NOINTERFACE;
@@ -110,14 +110,14 @@ internal static unsafe class Win32DropTarget
         return Ole32.E_NOINTERFACE;
     }
 
-    [UnmanagedCallersOnly(CallConvs = new[] { typeof(System.Runtime.CompilerServices.CallConvStdcall) })]
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvStdcall) })]
     private static uint AddRef(nint pThis)
     {
         var ptr = (Object*)pThis;
         return (uint)System.Threading.Interlocked.Increment(ref ptr->refCount);
     }
 
-    [UnmanagedCallersOnly(CallConvs = new[] { typeof(System.Runtime.CompilerServices.CallConvStdcall) })]
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvStdcall) })]
     private static uint ReleaseRef(nint pThis)
     {
         var ptr = (Object*)pThis;
@@ -130,7 +130,7 @@ internal static unsafe class Win32DropTarget
         return (uint)remaining;
     }
 
-    [UnmanagedCallersOnly(CallConvs = new[] { typeof(System.Runtime.CompilerServices.CallConvStdcall) })]
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvStdcall) })]
     private static int DragEnter(nint pThis, nint pDataObj, uint grfKeyState, POINTL pt, uint* pdwEffect)
     {
         var adapter = AdapterFor(pThis);
@@ -142,7 +142,7 @@ internal static unsafe class Win32DropTarget
         return Ole32.S_OK;
     }
 
-    [UnmanagedCallersOnly(CallConvs = new[] { typeof(System.Runtime.CompilerServices.CallConvStdcall) })]
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvStdcall) })]
     private static int DragOver(nint pThis, uint grfKeyState, POINTL pt, uint* pdwEffect)
     {
         var adapter = AdapterFor(pThis);
@@ -154,14 +154,14 @@ internal static unsafe class Win32DropTarget
         return Ole32.S_OK;
     }
 
-    [UnmanagedCallersOnly(CallConvs = new[] { typeof(System.Runtime.CompilerServices.CallConvStdcall) })]
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvStdcall) })]
     private static int DragLeave(nint pThis)
     {
         AdapterFor(pThis)?.OnDragLeave();
         return Ole32.S_OK;
     }
 
-    [UnmanagedCallersOnly(CallConvs = new[] { typeof(System.Runtime.CompilerServices.CallConvStdcall) })]
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvStdcall) })]
     private static int Drop(nint pThis, nint pDataObj, uint grfKeyState, POINTL pt, uint* pdwEffect)
     {
         var adapter = AdapterFor(pThis);
@@ -342,7 +342,7 @@ internal sealed unsafe class Win32DropTargetAdapter
 
 /// <summary>
 /// Reads a Win32 <c>IDataObject*</c> COM pointer and converts the supported formats into a managed
-/// <see cref="Platform.IDataObject"/> snapshot.
+/// <see cref="IDataObject"/> snapshot.
 /// </summary>
 internal static unsafe class Win32DataObjectAdapter
 {
@@ -351,16 +351,16 @@ internal static unsafe class Win32DataObjectAdapter
     private const int GetDataIndex = 3;
     private const int QueryGetDataIndex = 5;
 
-    public static Platform.IDataObject From(nint pDataObj, bool materialize)
+    public static IDataObject From(nint pDataObj, bool materialize)
     {
         var data = new Dictionary<string, object>(StringComparer.Ordinal);
-        if (pDataObj == 0) return new Platform.DataObject(data);
+        if (pDataObj == 0) return new DataObject(data);
 
         // Probe what's available; if not materializing, register format keys only (empty payload).
         if (HasFormat(pDataObj, Ole32.CF_HDROP, Ole32.TYMED_HGLOBAL))
         {
             data[StandardDataFormats.StorageItems] = materialize
-                ? (object)ReadHDrop(pDataObj) ?? Array.Empty<string>()
+                ? (object?)ReadHDrop(pDataObj) ?? Array.Empty<string>()
                 : Array.Empty<string>();
         }
 
@@ -377,7 +377,7 @@ internal static unsafe class Win32DataObjectAdapter
                 : string.Empty;
         }
 
-        return new Platform.DataObject(data);
+        return new DataObject(data);
     }
 
     private static bool HasFormat(nint pDataObj, ushort cfFormat, uint tymed)
