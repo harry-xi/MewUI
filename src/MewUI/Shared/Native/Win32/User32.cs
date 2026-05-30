@@ -398,6 +398,10 @@ internal static partial class User32
     [LibraryImport(LibraryName)]
     public static partial int GetMessageTime();
 
+    [LibraryImport(LibraryName)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool TrackMouseEvent(ref TRACKMOUSEEVENT lpEventTrack);
+
     #endregion
 
     #region Window hierarchy
