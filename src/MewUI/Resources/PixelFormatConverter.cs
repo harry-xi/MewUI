@@ -1,6 +1,7 @@
+using Aprillz.MewUI.Resources;
 using Aprillz.MewUI.Rendering.Simd;
 
-namespace Aprillz.MewUI.Resources;
+namespace Aprillz.MewUI;
 
 /// <summary>
 /// Converts non-BGRA pixel formats to MewUI's internal BGRA32 layout. Output is a
