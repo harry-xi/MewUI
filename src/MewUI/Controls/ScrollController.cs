@@ -144,8 +144,23 @@ internal sealed class ScrollController
     }
 
     /// <summary>
+    /// Scrolls by a fractional DIP delta (clamped). Suitable for both notch-quantized
+    /// input (mouse wheel) and continuous input (trackpad / high-resolution mouse).
+    /// </summary>
+    public bool ScrollByDip(int axis, double deltaDip)
+    {
+        if (deltaDip == 0 || double.IsNaN(deltaDip) || double.IsInfinity(deltaDip))
+        {
+            return false;
+        }
+
+        return SetOffsetDip(axis, GetOffsetDip(axis) + deltaDip);
+    }
+
+    /// <summary>
     /// Scrolls by a number of mouse-wheel notches (clamped).
     /// </summary>
+    [Obsolete("Use ScrollByDip(axis, notches * stepDip) — wheel input is normalized to fractional notches at the input boundary.")]
     public bool ScrollByNotches(int axis, int notches, double stepDip)
     {
         if (notches == 0)

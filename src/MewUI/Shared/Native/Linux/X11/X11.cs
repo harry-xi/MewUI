@@ -296,6 +296,31 @@ internal struct XKeyEvent
     public bool same_screen;
 }
 
+/// <summary>
+/// X11 mouse button codes as delivered in <see cref="XButtonEvent.button"/>.
+/// X11 reports wheel rotation as press/release of synthetic buttons 4–7.
+/// </summary>
+internal static class X11MouseButton
+{
+    public const uint Left = 1;
+    public const uint Middle = 2;
+    public const uint Right = 3;
+    public const uint WheelUp = 4;
+    public const uint WheelDown = 5;
+    public const uint WheelLeft = 6;
+    public const uint WheelRight = 7;
+}
+
+/// <summary>
+/// X11 modifier bits as carried in <see cref="XButtonEvent.state"/> / <see cref="XMotionEvent.state"/>.
+/// </summary>
+internal static class X11ModifierMask
+{
+    public const uint Button1 = 1u << 8;    // Left button held
+    public const uint Button2 = 1u << 9;    // Middle button held
+    public const uint Button3 = 1u << 10;   // Right button held
+}
+
 [StructLayout(LayoutKind.Sequential)]
 internal struct XButtonEvent
 {

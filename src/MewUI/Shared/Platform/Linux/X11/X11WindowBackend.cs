@@ -1574,8 +1574,8 @@ internal sealed class X11WindowBackend : IWindowBackend
         int yPx = e.y;
         var pos = new Point(xPx / Window.DpiScale, yPx / Window.DpiScale);
 
-        // X11 button: 1 left, 2 middle, 3 right, 4/5 v-wheel, 6/7 h-wheel.
-        if (e.button is 4 or 5 or 6 or 7)
+        if (e.button is X11MouseButton.WheelUp or X11MouseButton.WheelDown
+                     or X11MouseButton.WheelLeft or X11MouseButton.WheelRight)
         {
             if (!isDown)
             {
@@ -1585,29 +1585,37 @@ internal sealed class X11WindowBackend : IWindowBackend
             var wheelElement = WindowInputRouter.HitTest(Window, pos);
             WindowInputRouter.UpdateMouseOver(Window, wheelElement);
 
-            int delta = e.button is 4 or 6 ? 120 : -120;
-            
-            bool leftDown = (e.state & (1u << 8)) != 0;
-            bool middleDown = (e.state & (1u << 9)) != 0;
-            bool rightDown = (e.state & (1u << 10)) != 0;
-            bool isHorizontal = e.button is 6 or 7;
+            // X11 synthetic wheel buttons: each press = exactly one notch.
+            // Sign convention matches MouseWheelEventArgs.Delta (+Y up, +X left).
+            Vector delta = e.button switch
+            {
+                X11MouseButton.WheelUp => new Vector(0, +1.0),
+                X11MouseButton.WheelDown => new Vector(0, -1.0),
+                X11MouseButton.WheelLeft => new Vector(+1.0, 0),
+                X11MouseButton.WheelRight => new Vector(-1.0, 0),
+                _ => default,
+            };
 
-            WindowInputRouter.MouseWheel(Window, pos, ClientToScreen(pos), delta, isHorizontal, leftDown, rightDown, middleDown); WindowInputRouter.MouseWheel(Window, pos, ClientToScreen(pos), delta, isHorizontal, leftDown, rightDown, middleDown); WindowInputRouter.MouseWheel(Window, pos, ClientToScreen(pos), delta, isHorizontal, leftDown, rightDown, middleDown); WindowInputRouter.MouseWheel(Window, pos, ClientToScreen(pos), delta, isHorizontal, leftDown, rightDown, middleDown); WindowInputRouter.MouseWheel(Window, pos, ClientToScreen(pos), delta, isHorizontal, leftDown, rightDown, middleDown);
+            bool leftDown = (e.state & X11ModifierMask.Button1) != 0;
+            bool middleDown = (e.state & X11ModifierMask.Button2) != 0;
+            bool rightDown = (e.state & X11ModifierMask.Button3) != 0;
+
+            WindowInputRouter.MouseWheel(Window, pos, ClientToScreen(pos), delta, leftDown, rightDown, middleDown);
 
             return;
         }
 
         var btn = e.button switch
         {
-            1 => MouseButton.Left,
-            2 => MouseButton.Middle,
-            3 => MouseButton.Right,
-            _ => MouseButton.Left
+            X11MouseButton.Left => MouseButton.Left,
+            X11MouseButton.Middle => MouseButton.Middle,
+            X11MouseButton.Right => MouseButton.Right,
+            _ => MouseButton.Left,
         };
 
-        bool left = (e.state & (1u << 8)) != 0;
-        bool middle = (e.state & (1u << 9)) != 0;
-        bool right = (e.state & (1u << 10)) != 0;
+        bool left = (e.state & X11ModifierMask.Button1) != 0;
+        bool middle = (e.state & X11ModifierMask.Button2) != 0;
+        bool right = (e.state & X11ModifierMask.Button3) != 0;
 
         // Include the current transition.
         switch (btn)
@@ -1664,9 +1672,9 @@ internal sealed class X11WindowBackend : IWindowBackend
         var pos = new Point(e.x / Window.DpiScale, e.y / Window.DpiScale);
         var screenPos = ClientToScreen(pos);
 
-        bool left = (e.state & (1u << 8)) != 0;
-        bool middle = (e.state & (1u << 9)) != 0;
-        bool right = (e.state & (1u << 10)) != 0;
+        bool left = (e.state & X11ModifierMask.Button1) != 0;
+        bool middle = (e.state & X11ModifierMask.Button2) != 0;
+        bool right = (e.state & X11ModifierMask.Button3) != 0;
 
         WindowInputRouter.MouseMove(Window, pos, screenPos, leftDown: left, rightDown: right, middleDown: middle);
     }
@@ -2355,8 +2363,8 @@ internal sealed class X11WindowBackend : IWindowBackend
     // X11 WM removes all decorations (title bar + border + shadow) — not a true
     // "extend client area" like Win32/macOS. Reported as None so NativeCustomWindow
     // keeps the default title bar on X11.
-    public Controls.WindowChromeCapabilities ChromeCapabilities =>
-        Controls.WindowChromeCapabilities.None;
+    public WindowChromeCapabilities ChromeCapabilities =>
+        WindowChromeCapabilities.None;
 
     public void SetAllowsTransparency(bool allowsTransparency)
     {

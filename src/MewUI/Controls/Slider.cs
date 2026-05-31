@@ -1,3 +1,4 @@
+using Aprillz.MewUI.Input;
 using Aprillz.MewUI.Rendering;
 
 namespace Aprillz.MewUI.Controls;
@@ -8,6 +9,7 @@ namespace Aprillz.MewUI.Controls;
 public sealed class Slider : RangeBase
 {
     private bool _isDragging;
+    private WheelNotchAccumulator _wheelAccumulator;
 
     public static readonly MewProperty<Color> ThumbBrushProperty =
         MewProperty<Color>.Register<Slider>(nameof(ThumbBrush), default, MewPropertyOptions.AffectsRender);
@@ -176,8 +178,14 @@ public sealed class Slider : RangeBase
             return;
         }
 
-        double step = GetKeyboardSmallStep();
-        SetValueInternal(Value + (e.Delta > 0 ? step : -step), true);
+        int notches = _wheelAccumulator.TakeY(e.Delta.Y);
+        if (notches == 0)
+        {
+            e.Handled = true;
+            return;
+        }
+
+        SetValueInternal(Value + notches * GetKeyboardSmallStep(), true);
         e.Handled = true;
     }
 

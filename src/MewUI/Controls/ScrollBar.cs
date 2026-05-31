@@ -1,3 +1,4 @@
+using Aprillz.MewUI.Input;
 using Aprillz.MewUI.Rendering;
 
 
@@ -26,6 +27,7 @@ public sealed class ScrollBar : RangeBase
 
     private double _dragStartPos;
     private double _dragStartValue;
+    private WheelNotchAccumulator _wheelAccumulator;
 
     private bool IsDragging
     {
@@ -221,14 +223,16 @@ public sealed class ScrollBar : RangeBase
             return;
         }
 
-        // 120 is a common wheel delta unit on Windows, but we treat it as "one notch"
-        int steps = Math.Sign(e.Delta);
-        if (steps == 0)
+        // ScrollBar honours its axis: vertical bar reads Y, horizontal reads X.
+        double axisDelta = Orientation == Orientation.Vertical ? e.Delta.Y : e.Delta.X;
+        int notches = _wheelAccumulator.TakeY(axisDelta);
+        if (notches == 0)
         {
+            e.Handled = true;
             return;
         }
 
-        Value -= steps * SmallChange;
+        Value -= notches * SmallChange;
         e.Handled = true;
     }
 
