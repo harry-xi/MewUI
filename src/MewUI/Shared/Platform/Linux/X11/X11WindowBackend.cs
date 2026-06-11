@@ -121,6 +121,16 @@ internal sealed class X11WindowBackend : IWindowBackend
 
         _shown = true;
         NativeX11.XMapWindow(Display, Handle);
+
+        if (Window.IsOverlayWindow)
+        {
+            // Override-redirect overlay: raise above everything (the WM does not stack it) and never take
+            // focus/activation (it must not steal capture/focus from the drag source).
+            NativeX11.XRaiseWindow(Display, Handle);
+            NativeX11.XFlush(Display);
+            return;
+        }
+
         NativeX11.XFlush(Display);
         ApplyResolvedStartupPosition();
         if (Window.WindowState != Controls.WindowState.Normal)
@@ -204,7 +214,9 @@ internal sealed class X11WindowBackend : IWindowBackend
         }
     }
 
-    private uint _motifFunctions = 0x3F; // MWM_FUNC_ALL | RESIZE | MOVE | MINIMIZE | MAXIMIZE | CLOSE
+    // Enabled MWM functions, WITHOUT the ALL bit (0x01) which inverts the meaning (listed = disabled).
+    // 0x3E = RESIZE | MOVE | MINIMIZE | MAXIMIZE | CLOSE.
+    private uint _motifFunctions = 0x3E;
 
     public void SetCanMinimize(bool value)
     {
@@ -253,8 +265,27 @@ internal sealed class X11WindowBackend : IWindowBackend
         }
 
         // _MOTIF_WM_HINTS: flags, functions, decorations, input_mode, status
-        // flags = MWM_HINTS_FUNCTIONS (1)
-        var hints = new long[] { 1, _motifFunctions, 0, 0, 0 };
+        const long MWM_HINTS_FUNCTIONS = 1 << 0;   // functions field meaningful
+        const long MWM_HINTS_DECORATIONS = 1 << 1; // decorations field meaningful
+
+        long flags;
+        long decorations;
+        if (_allowsTransparency)
+        {
+            // Borderless: assert only decorations-off (re-asserted here since this is PropModeReplace). Don't
+            // constrain FUNCTIONS - it is pointless without native buttons and can kill WM move/resize.
+            flags = MWM_HINTS_DECORATIONS;
+            decorations = 0;
+        }
+        else
+        {
+            // Decorated window: constrain the native chrome functions (CanMinimize/CanMaximize gate the WM's
+            // minimize/maximize buttons) and keep WM decorations.
+            flags = MWM_HINTS_FUNCTIONS;
+            decorations = 1;
+        }
+
+        var hints = new long[] { flags, _motifFunctions, decorations, 0, 0 };
         unsafe
         {
             fixed (long* p = hints)
@@ -705,6 +736,23 @@ internal sealed class X11WindowBackend : IWindowBackend
             attrs.border_pixel = 0;
             valueMask |= CWBackPixel | CWBorderPixel;
         }
+        else
+        {
+            // Opaque window: with no background pixel the server leaves the client area undefined from map until
+            // the first paint, briefly showing the desktop behind it. Seed the same color the window clears to on
+            // paint, so the surface is filled on map and any resize-edge fill is effectively invisible.
+            attrs.background_pixel = PackVisualPixel(Window.EffectiveOpaqueBackground, visualInfo.red_mask, visualInfo.green_mask, visualInfo.blue_mask);
+            valueMask |= CWBackPixel;
+        }
+
+        // Input-transparent overlay: override-redirect = WM-unmanaged (no decoration/focus/taskbar), app-raised.
+        // Click-through during a drag is covered by the pointer grab + the router skipping these windows.
+        const ulong CWOverrideRedirect = 1UL << 9;
+        if (Window.IsOverlayWindow)
+        {
+            attrs.override_redirect = true;
+            valueMask |= CWOverrideRedirect;
+        }
 
         Handle = NativeX11.XCreateWindow(
             Display,
@@ -768,6 +816,7 @@ internal sealed class X11WindowBackend : IWindowBackend
 
         ApplyOpacity();
         ApplyResizeMode();
+        ApplyToolWindowHints();
 
         _inputMethod = X11InputMethodFactory.Create(Display, Handle);
         if (_inputMethod is XimInputMethod xim && xim.TryGetFilterEvents(out var imeFilterEvents))
@@ -785,6 +834,23 @@ internal sealed class X11WindowBackend : IWindowBackend
         TryInitializeXI2();
 
         NeedsRender = true;
+    }
+
+    // Packs an RGB color into a pixel value for the given TrueColor/DirectColor visual masks.
+    private static ulong PackVisualPixel(Color color, ulong redMask, ulong greenMask, ulong blueMask)
+    {
+        return ScaleChannelToMask(color.R, redMask)
+            | ScaleChannelToMask(color.G, greenMask)
+            | ScaleChannelToMask(color.B, blueMask);
+    }
+
+    private static ulong ScaleChannelToMask(byte channel, ulong mask)
+    {
+        if (mask == 0) return 0;
+        int shift = 0;
+        while ((mask & 1UL) == 0) { mask >>= 1; shift++; }
+        // mask is now the per-channel maximum (e.g. 0xFF for an 8-bit channel).
+        return ((ulong)channel * mask / 255UL) << shift;
     }
 
     /// <summary>
@@ -2515,21 +2581,67 @@ internal sealed class X11WindowBackend : IWindowBackend
         {
             NativeX11.XSetTransientForHint(Display, Handle, ownerHandle);
 
-            // Best-effort EWMH modal hint.
-            var netWmState = NativeX11.XInternAtom(Display, "_NET_WM_STATE", false);
-            var netWmStateModal = NativeX11.XInternAtom(Display, "_NET_WM_STATE_MODAL", false);
-            if (netWmState != 0 && netWmStateModal != 0)
+            // EWMH modal hint — ONLY for true modal dialogs (ShowDialog). A plain owned window (Show(owner))
+            // must not be modal, otherwise the WM/compositor (e.g. XWayland) dims the owner and treats it as a
+            // dialog. Setting transient-for alone is enough to keep an owned window above its owner. Best-effort.
+            if (Window.IsDialogWindow)
             {
-                unsafe
+                var netWmState = NativeX11.XInternAtom(Display, "_NET_WM_STATE", false);
+                var netWmStateModal = NativeX11.XInternAtom(Display, "_NET_WM_STATE_MODAL", false);
+                if (netWmState != 0 && netWmStateModal != 0)
                 {
-                    nint data = netWmStateModal;
-                    NativeX11.XChangeProperty(Display, Handle, netWmState, type: 4 /*ATOM*/, format: 32, mode: 0 /*Replace*/, (nint)(&data), nelements: 1);
+                    unsafe
+                    {
+                        nint data = netWmStateModal;
+                        NativeX11.XChangeProperty(Display, Handle, netWmState, type: 4 /*ATOM*/, format: 32, mode: 0 /*Replace*/, (nint)(&data), nelements: 1);
+                    }
                 }
             }
         }
         catch
         {
             // Best-effort.
+        }
+    }
+
+    // Marks the window as a floating tool/utility window: _NET_WM_WINDOW_TYPE_UTILITY (thin WM decoration) +
+    // skip-taskbar. Set as properties before the window is mapped (a _NET_WM_STATE ClientMessage only applies
+    // once the WM manages the window). Owner/transient is set separately via SetOwner. Best-effort — WMs vary
+    // in utility-type support, degrading to a normal (skip-taskbar) window. Mutually exclusive with transparency.
+    private void ApplyToolWindowHints()
+    {
+        if (Display == 0 || Handle == 0 || !Window.IsToolWindow || _allowsTransparency)
+        {
+            return;
+        }
+
+        try
+        {
+            var windowType = NativeX11.XInternAtom(Display, "_NET_WM_WINDOW_TYPE", false);
+            var windowTypeUtility = NativeX11.XInternAtom(Display, "_NET_WM_WINDOW_TYPE_UTILITY", false);
+            if (windowType != 0 && windowTypeUtility != 0)
+            {
+                unsafe
+                {
+                    nint data = windowTypeUtility;
+                    NativeX11.XChangeProperty(Display, Handle, windowType, type: 4 /*ATOM*/, format: 32, mode: 0 /*Replace*/, (nint)(&data), nelements: 1);
+                }
+            }
+
+            var netWmState = NativeX11.XInternAtom(Display, "_NET_WM_STATE", false);
+            var skipTaskbar = NativeX11.XInternAtom(Display, "_NET_WM_STATE_SKIP_TASKBAR", false);
+            if (netWmState != 0 && skipTaskbar != 0)
+            {
+                unsafe
+                {
+                    nint data = skipTaskbar;
+                    NativeX11.XChangeProperty(Display, Handle, netWmState, type: 4 /*ATOM*/, format: 32, mode: 0 /*Replace*/, (nint)(&data), nelements: 1);
+                }
+            }
+        }
+        catch
+        {
+            // Best-effort — WMs vary in utility-type support.
         }
     }
 

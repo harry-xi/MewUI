@@ -186,7 +186,18 @@ internal sealed class MacOSWindowBackend : IWindowBackend
             MacOSWindowInterop.SetAlertPanelAnimation(_nsWindow);
         }
 
-        MacOSWindowInterop.ShowWindow(_nsWindow);
+        if (_window.IsOverlayWindow)
+        {
+            // Input-transparent overlay (drag preview): click-through (ignoresMouseEvents) + float above all +
+            // order front WITHOUT making it key/main, so it never steals capture/focus from the drag source.
+            MacOSWindowInterop.SetWindowEnabled(_nsWindow, false); // ignoresMouseEvents = true
+            MacOSWindowInterop.SetWindowLevel(_nsWindow, 25);      // NSStatusWindowLevel: above normal/floating
+            MacOSWindowInterop.OrderFrontWindow(_nsWindow);
+        }
+        else
+        {
+            MacOSWindowInterop.ShowWindow(_nsWindow);
+        }
 
         if (_window.IsDialogWindow)
         {
@@ -198,7 +209,13 @@ internal sealed class MacOSWindowBackend : IWindowBackend
             MacOSWindowInterop.HideCloseButton(_nsWindow);
         }
 
-        if (_allowsTransparency)
+        if (_allowsTransparency && _window.IsOverlayWindow)
+        {
+            // Borderless mask = square corners (titled windows get rounded corners that would clip the overlay's
+            // own content, e.g. a rounded chip). Transparency comes from the non-opaque layer, not the mask.
+            MacOSWindowInterop.SetWindowStyleMask(_nsWindow, 0); // NSWindowStyleMaskBorderless
+        }
+        else if (_allowsTransparency)
         {
             MacOSWindowInterop.SetWindowStyleMask(_nsWindow, MacOSWindowInterop.TransparentStyleMask);
             MacOSWindowInterop.SetTitlebarForTransparency(_nsWindow, true);
@@ -239,8 +256,18 @@ internal sealed class MacOSWindowBackend : IWindowBackend
     {
         if (_nsWindow != 0)
         {
-            MacOSWindowInterop.CloseWindow(_nsWindow);
-            // windowShouldClose → RequestClose, windowWillClose → RaiseClosedOnce
+            if (_window.IsOverlayWindow)
+            {
+                // The overlay uses a borderless style mask (square corners), which has no
+                // Closable bit, so performClose: would be ignored. Close it directly. windowWillClose still
+                // fires RaiseClosedOnce.
+                MacOSWindowInterop.CloseWindowImmediate(_nsWindow);
+            }
+            else
+            {
+                MacOSWindowInterop.CloseWindow(_nsWindow);
+                // windowShouldClose → RequestClose, windowWillClose → RaiseClosedOnce
+            }
         }
     }
 
@@ -467,6 +494,25 @@ internal sealed class MacOSWindowBackend : IWindowBackend
     public void ReleaseMouseCapture()
     { }
 
+    // Cocoa screen coordinates are Y-up (origin at the screen's bottom-left). The framework's screen-pixel
+    // contract is top-left, Y-down (see IPlatformHost.GetCursorScreenPosition), matching Window.MoveTo. These
+    // helpers convert between the two so all macOS screen pixels honor the top-down contract.
+    private Point CocoaScreenPointToTopLeftPx(NSPoint cocoaPoint)
+    {
+        double scale = _lastDpiScale > 0 ? _lastDpiScale : 1.0;
+        var screenFrame = GetPositioningScreenFrame();
+        double topY = (screenFrame.origin.y + screenFrame.size.height) - cocoaPoint.y;
+        return new Point(cocoaPoint.x * scale, topY * scale);
+    }
+
+    private NSPoint TopLeftPxToCocoaScreenPoint(Point topLeftPx)
+    {
+        double scale = _lastDpiScale > 0 ? _lastDpiScale : 1.0;
+        var screenFrame = GetPositioningScreenFrame();
+        double cocoaY = (screenFrame.origin.y + screenFrame.size.height) - (topLeftPx.Y / scale);
+        return new NSPoint(topLeftPx.X / scale, cocoaY);
+    }
+
     public Point ClientToScreen(Point clientPointDip)
     {
         if (_nsWindow == 0)
@@ -477,8 +523,7 @@ internal sealed class MacOSWindowBackend : IWindowBackend
         var client = _window.ClientSize;
         var windowPoint = new NSPoint(clientPointDip.X, client.Height - clientPointDip.Y);
         var screenPoint = MacOSWindowInterop.WindowConvertPointToScreen(_nsWindow, windowPoint);
-        double scale = _lastDpiScale > 0 ? _lastDpiScale : 1.0;
-        return new Point(screenPoint.x * scale, screenPoint.y * scale);
+        return CocoaScreenPointToTopLeftPx(screenPoint);
     }
 
     public Point ScreenToClient(Point screenPointPx)
@@ -489,10 +534,9 @@ internal sealed class MacOSWindowBackend : IWindowBackend
         }
 
         var client = _window.ClientSize;
-        double scale = _lastDpiScale > 0 ? _lastDpiScale : 1.0;
         var windowPoint = MacOSWindowInterop.WindowConvertPointFromScreen(
             _nsWindow,
-            new NSPoint(screenPointPx.X / scale, screenPointPx.Y / scale));
+            TopLeftPxToCocoaScreenPoint(screenPointPx));
         return new Point(windowPoint.x, client.Height - windowPoint.y);
     }
 
@@ -750,7 +794,6 @@ internal sealed class MacOSWindowBackend : IWindowBackend
         var client = _window.ClientSize;
         var localPoint = new Point(windowPoint.x, client.Height - windowPoint.y);
         var screenPoint = MacOSWindowInterop.WindowConvertPointToScreen(_nsWindow, windowPoint);
-        double scale = _lastDpiScale > 0 ? _lastDpiScale : 1.0;
 
         var data = new DataObject(new Dictionary<string, object>
         {
@@ -760,7 +803,7 @@ internal sealed class MacOSWindowBackend : IWindowBackend
         return new DragEventArgs(
             data,
             localPoint,
-            new Point(screenPoint.x * scale, screenPoint.y * scale));
+            CocoaScreenPointToTopLeftPx(screenPoint));
     }
 
     internal ulong HandleNativeDragEnter(IReadOnlyList<string> paths, NSPoint windowPoint)
@@ -827,7 +870,8 @@ internal sealed class MacOSWindowBackend : IWindowBackend
             widthDip: initialClientSize.Width,
             heightDip: initialClientSize.Height,
             allowsTransparency: _allowsTransparency,
-            isDialog: _window.IsDialogWindow);
+            isDialog: _window.IsDialogWindow,
+            isToolWindow: _window.IsToolWindow);
 
         if (_nsWindow != 0)
         {

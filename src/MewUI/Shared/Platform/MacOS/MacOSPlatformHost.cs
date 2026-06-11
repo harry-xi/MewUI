@@ -148,6 +148,27 @@ public sealed class MacOSPlatformHost : IPlatformHost
         }
     }
 
+    // Global cursor position in the screen-px convention shared with ClientToScreen/ScreenToClient (Cocoa
+    // points × backing scale, bottom-left origin). Enables cross-window drag routing (WindowDragDropRouter).
+    public Point GetCursorScreenPosition()
+    {
+        var location = MacOSInterop.GetMouseScreenLocation();
+        double scale = MacOSInterop.GetMainScreenScaleFactor();
+        if (scale <= 0)
+        {
+            scale = 1.0;
+        }
+        // mouseLocation is Cocoa (Y-up). Flip to the top-left, Y-down screen-pixel contract (matches
+        // Window.MoveTo and the per-window ClientToScreen/ScreenToClient conversions).
+        var frame = MacOSInterop.GetMainScreenFrame();
+        double topY = (frame.origin.y + frame.size.height) - location.y;
+        return new Point(location.x * scale, topY * scale);
+    }
+
+    // setIgnoresMouseEvents (click-through) + orderFront-without-makeKey (no-activate) + high window level give
+    // a non-activating, click-through, transparent overlay.
+    public bool SupportsTransparentOverlay => true;
+
     private void RenderAllWindows()
     {
         if (_windows.Count == 0)
