@@ -21,21 +21,31 @@ set PROJECTS=^
   src\MewUI.Backend.Gdi\MewUI.Backend.Gdi.csproj^
   src\MewUI.Backend.MewVG.Win32\MewUI.Backend.MewVG.Win32.csproj^
   src\MewUI.Backend.MewVG.X11\MewUI.Backend.MewVG.X11.csproj^
-  src\MewUI.Backend.MewVG.MacOS\MewUI.Backend.MewVG.MacOS.csproj
+  src\MewUI.Backend.MewVG.MacOS\MewUI.Backend.MewVG.MacOS.csproj^
+  src\MewUI.Skia\MewUI.Skia.csproj^
+  src\MewUI.Skia.Interop.Direct2D\MewUI.Skia.Interop.Direct2D.csproj^
+  src\MewUI.Skia.Interop.Gdi\MewUI.Skia.Interop.Gdi.csproj^
+  src\MewUI.Skia.Interop.MewVG.Win32\MewUI.Skia.Interop.MewVG.Win32.csproj^
+  src\MewUI.Skia.Interop.MewVG.X11\MewUI.Skia.Interop.MewVG.X11.csproj^
+  src\MewUI.Skia.Interop.MewVG.MacOS\MewUI.Skia.Interop.MewVG.MacOS.csproj
 
 REM --- Metapackages (meta) ---
 set PROJECTS=%PROJECTS%^
   meta\MewUI.Windows\MewUI.Windows.csproj^
   meta\MewUI.Linux\MewUI.Linux.csproj^
   meta\MewUI.MacOS\MewUI.MacOS.csproj^
-  meta\MewUI.All\MewUI.All.csproj
+  meta\MewUI.All\MewUI.All.csproj^
+  meta\MewUI.Skia.Windows\MewUI.Skia.Windows.csproj^
+  meta\MewUI.Skia.Linux\MewUI.Skia.Linux.csproj^
+  meta\MewUI.Skia.MacOS\MewUI.Skia.MacOS.csproj^
+  meta\MewUI.Skia.All\MewUI.Skia.All.csproj
 
 for %%P in (%PROJECTS%) do (
   echo Packing %%P ...
   if "%VERSION%"=="" (
-    dotnet pack "%ROOT%\%%P" -c Release -o "%OUT%" /p:ContinuousIntegrationBuild=true
+    dotnet pack "%ROOT%\%%P" -c Release -o "%OUT%" /p:ContinuousIntegrationBuild=true /nr:false
   ) else (
-    dotnet pack "%ROOT%\%%P" -c Release -o "%OUT%" /p:ContinuousIntegrationBuild=true /p:PackageVersion=%VERSION%
+    dotnet pack "%ROOT%\%%P" -c Release -o "%OUT%" /p:ContinuousIntegrationBuild=true /p:PackageVersion=%VERSION% /nr:false
   )
   if errorlevel 1 (
     echo FAILED: %%P
