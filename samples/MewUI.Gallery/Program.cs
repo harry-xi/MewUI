@@ -1,4 +1,3 @@
-//#define MINIMAL
 using System.Diagnostics;
 
 using Aprillz.MewUI;
@@ -39,9 +38,7 @@ var maxFpsEnabled = new ObservableValue<bool>(false);
 
 var currentAccent = ThemeManager.DefaultAccent;
 
-#if !MINIMAL
 var logo = ImageSource.FromFile(GalleryView.CombineBaseDirectory("Resources", "logo_h-1280.png"));
-#endif
 
 var timer = new DispatcherTimer().Interval(TimeSpan.FromSeconds(1)).OnTick(() => CheckFPS(ref fpsFrames));
 Application.DispatcherUnhandledException += e =>
@@ -66,12 +63,10 @@ Application
                     .Margin(8)
                     .Children(
                         TopBar()
-#if !MINIMAL
                             .DockTop(),
 
                         new GalleryView(window)
                             .Ref(out gallery)
-#endif
                     )
             )
             .OnLoaded(() =>
@@ -139,29 +134,23 @@ FrameworkElement TopBar() => new Border()
                     .Horizontal()
                     .Spacing(8)
                     .Children(
-#if !MINIMAL
                         new Image()
                             .Source(logo)
                             .ImageScaleQuality(ImageScaleQuality.HighQuality)
                             .Width(300)
                             .Height(80)
                             .CenterVertical(),
-#endif
 
                         new StackPanel()
                             .Vertical()
                             .Spacing(2)
                             .Children(
                                 new TextBlock()
-#if MINIMAL
-                                    .Text("Hello, MewUI!")
-#else 
                                     .Text("Aprillz.MewUI Gallery")
-#endif
                                     .WithTheme((t, c) => c.Foreground(t.Palette.Accent))
                                     .FontSize(18)
-                                    .SemiBold(), 
-                                
+                                    .SemiBold(),
+
                                 new TextBlock()
                                     .Ref(out backendText)
                             )
@@ -250,6 +239,7 @@ FrameworkElement AccentPicker() => new StackPanel()
 Button AccentSwatch(Accent accent) => new Button()
     .CornerRadius(11)
     .CenterVertical()
+    .MinHeight(22)
     .Width(22)
     .Height(22)
     .BorderThickness(0)

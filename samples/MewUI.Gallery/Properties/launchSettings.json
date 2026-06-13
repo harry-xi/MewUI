@@ -12,8 +12,7 @@
       "commandLineArgs": "--gdi"
     },
     "WSL": {
-      "commandName": "WSL2",
-      "distributionName": "Ubuntu-24.04"
+      "commandName": "WSL"
     }
   }
 }
