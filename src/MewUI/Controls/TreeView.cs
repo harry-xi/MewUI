@@ -5,27 +5,6 @@ using Aprillz.MewUI.Rendering;
 namespace Aprillz.MewUI.Controls;
 
 /// <summary>
-/// Specifies which user interaction(s) toggle node expansion in a <see cref="TreeView"/>.
-/// </summary>
-public enum TreeViewExpandTrigger
-{
-    /// <summary>
-    /// Expands/collapses when the expander chevron is clicked.
-    /// </summary>
-    ClickChevron,
-
-    /// <summary>
-    /// Expands/collapses when the expander chevron is clicked, or when a node row is double-clicked.
-    /// </summary>
-    DoubleClickNode,
-
-    /// <summary>
-    /// Expands/collapses when the expander chevron is clicked, or when a node row is single-clicked.
-    /// </summary>
-    ClickNode,
-}
-
-/// <summary>
 /// A hierarchical tree view control with expand/collapse functionality.
 /// </summary>
 public sealed class TreeView : Control, ISubtreeInvalidationHost, IFocusIntoViewHost, IVirtualizedTabNavigationHost
@@ -68,7 +47,6 @@ public sealed class TreeView : Control, ISubtreeInvalidationHost, IFocusIntoView
             _presenter.ItemsSource = _itemsSource;
             _presenter.RecycleAll();
             InvalidateItemBindings();
-
         }
     }
 
@@ -119,6 +97,16 @@ public sealed class TreeView : Control, ISubtreeInvalidationHost, IFocusIntoView
     /// Occurs when the selected node changes.
     /// </summary>
     public event Action<TreeViewNode?>? SelectedNodeChanged;
+
+    /// <summary>
+    /// Occurs immediately before an item is expanded.
+    /// </summary>
+    public event Action<TreeViewExpansionEventArgs>? Expanding;
+
+    /// <summary>
+    /// Occurs immediately before an item is collapsed.
+    /// </summary>
+    public event Action<TreeViewExpansionEventArgs>? Collapsing;
 
     /// <summary>
     /// Gets or sets the height of each tree node row.
@@ -435,16 +423,14 @@ public sealed class TreeView : Control, ISubtreeInvalidationHost, IFocusIntoView
     /// <param name="node">The node to expand.</param>
     public void Expand(TreeViewNode node)
     {
-        if (_itemsSource is TreeViewNodeItemsView nodeView)
-        {
-            nodeView.Expand(node);
-            return;
-        }
-
         int idx = IndexOfNode(node);
         if (idx >= 0)
         {
-            _itemsSource.SetIsExpanded(idx, true);
+            TrySetExpanded(idx, true);
+        }
+        else if (_itemsSource is TreeViewNodeItemsView nodeView)
+        {
+            nodeView.Expand(node);
         }
     }
 
@@ -454,16 +440,14 @@ public sealed class TreeView : Control, ISubtreeInvalidationHost, IFocusIntoView
     /// <param name="node">The node to collapse.</param>
     public void Collapse(TreeViewNode node)
     {
-        if (_itemsSource is TreeViewNodeItemsView nodeView)
-        {
-            nodeView.Collapse(node);
-            return;
-        }
-
         int idx = IndexOfNode(node);
         if (idx >= 0)
         {
-            _itemsSource.SetIsExpanded(idx, false);
+            TrySetExpanded(idx, false);
+        }
+        else if (_itemsSource is TreeViewNodeItemsView nodeView)
+        {
+            nodeView.Collapse(node);
         }
     }
 
@@ -747,7 +731,7 @@ public sealed class TreeView : Control, ISubtreeInvalidationHost, IFocusIntoView
         bool hasChildren = _itemsSource.GetHasChildren(index);
         if (hasChildren && (onGlyph || ExpandTrigger == TreeViewExpandTrigger.ClickNode))
         {
-            _itemsSource.SetIsExpanded(index, !_itemsSource.GetIsExpanded(index));
+            TryToggleExpanded(index);
         }
 
         e.Handled = true;
@@ -779,7 +763,7 @@ public sealed class TreeView : Control, ISubtreeInvalidationHost, IFocusIntoView
 
         Focus();
         _itemsSource.SelectedIndex = index;
-        _itemsSource.SetIsExpanded(index, !_itemsSource.GetIsExpanded(index));
+        TryToggleExpanded(index);
         e.Handled = true;
     }
 
@@ -895,8 +879,7 @@ public sealed class TreeView : Control, ISubtreeInvalidationHost, IFocusIntoView
 
                 if (_itemsSource.GetHasChildren(index))
                 {
-                    _itemsSource.SetIsExpanded(index, !_itemsSource.GetIsExpanded(index));
-                    e.Handled = true;
+                    e.Handled = TryToggleExpanded(index);
                 }
             }
             break;
@@ -911,8 +894,7 @@ public sealed class TreeView : Control, ISubtreeInvalidationHost, IFocusIntoView
 
                 if (_itemsSource.GetHasChildren(index) && !_itemsSource.GetIsExpanded(index))
                 {
-                    _itemsSource.SetIsExpanded(index, true);
-                    e.Handled = true;
+                    e.Handled = TrySetExpanded(index, true);
                 }
             }
             break;
@@ -927,8 +909,7 @@ public sealed class TreeView : Control, ISubtreeInvalidationHost, IFocusIntoView
 
                 if (_itemsSource.GetHasChildren(index) && _itemsSource.GetIsExpanded(index))
                 {
-                    _itemsSource.SetIsExpanded(index, false);
-                    e.Handled = true;
+                    e.Handled = TrySetExpanded(index, false);
                 }
             }
             break;
@@ -1133,11 +1114,87 @@ public sealed class TreeView : Control, ISubtreeInvalidationHost, IFocusIntoView
     }
 
     private int IndexOfNode(TreeViewNode node)
+        => IndexOfItem(node, _itemsSource.KeySelector?.Invoke(node));
+
+    private bool TryToggleExpanded(int index)
+    {
+        if (index < 0 || index >= _itemsSource.Count)
+        {
+            return false;
+        }
+
+        return TrySetExpanded(index, !_itemsSource.GetIsExpanded(index));
+    }
+
+    private bool TrySetExpanded(int index, bool expanded)
+    {
+        if (index < 0 || index >= _itemsSource.Count)
+        {
+            return false;
+        }
+
+        if (expanded && !_itemsSource.GetHasChildren(index))
+        {
+            return false;
+        }
+
+        if (_itemsSource.GetIsExpanded(index) == expanded)
+        {
+            return false;
+        }
+
+        var item = _itemsSource.GetItem(index);
+        var key = _itemsSource.KeySelector?.Invoke(item);
+        var args = new TreeViewExpansionEventArgs(item);
+
+        if (expanded)
+        {
+            Expanding?.Invoke(args);
+        }
+        else
+        {
+            Collapsing?.Invoke(args);
+        }
+
+        index = IndexOfItem(item, key);
+        if (index < 0)
+        {
+            return false;
+        }
+
+        if (expanded && !_itemsSource.GetHasChildren(index))
+        {
+            return false;
+        }
+
+        if (_itemsSource.GetIsExpanded(index) != expanded)
+        {
+            _itemsSource.SetIsExpanded(index, expanded);
+        }
+
+        return true;
+    }
+
+    private int IndexOfItem(object? item, object? key)
     {
         int count = _itemsSource.Count;
         for (int i = 0; i < count; i++)
         {
-            if (ReferenceEquals(_itemsSource.GetItem(i), node))
+            if (ReferenceEquals(_itemsSource.GetItem(i), item))
+            {
+                return i;
+            }
+        }
+
+        var keySelector = _itemsSource.KeySelector;
+        if (keySelector == null || key == null)
+        {
+            return -1;
+        }
+
+        for (int i = 0; i < count; i++)
+        {
+            if (Equals(keySelector(_itemsSource.GetItem(i)), key))
             {
                 return i;
             }
@@ -1152,4 +1209,38 @@ public sealed class TreeView : Control, ISubtreeInvalidationHost, IFocusIntoView
         double size = 4;
         Glyph.Draw(context, center, size, color, expanded ? GlyphKind.ChevronDown : GlyphKind.ChevronRight);
     }
+}
+
+/// <summary>
+/// Specifies which user interaction(s) toggle node expansion in a <see cref="TreeView"/>.
+/// </summary>
+public enum TreeViewExpandTrigger
+{
+    /// <summary>
+    /// Expands/collapses when the expander chevron is clicked.
+    /// </summary>
+    ClickChevron,
+
+    /// <summary>
+    /// Expands/collapses when the expander chevron is clicked, or when a node row is double-clicked.
+    /// </summary>
+    DoubleClickNode,
+
+    /// <summary>
+    /// Expands/collapses when the expander chevron is clicked, or when a node row is single-clicked.
+    /// </summary>
+    ClickNode,
+}
+
+/// <summary>
+/// Provides the item associated with a tree expansion-state change.
+/// </summary>
+public sealed class TreeViewExpansionEventArgs
+{
+    public TreeViewExpansionEventArgs(object? item)
+    {
+        Item = item;
+    }
+
+    public object? Item { get; }
 }

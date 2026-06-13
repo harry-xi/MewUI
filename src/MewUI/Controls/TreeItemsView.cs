@@ -16,7 +16,7 @@ public interface ITreeItemsView : ISelectableItemsView
     int GetDepth(int index);
 
     /// <summary>
-    /// Gets whether the item at <paramref name="index"/> has children.
+    /// Gets whether the item at <paramref name="index"/> can expand and should display an expander.
     /// </summary>
     bool GetHasChildren(int index);
 
@@ -49,12 +49,17 @@ public static class TreeItemsView
     /// <param name="childrenSelector">Function that returns children for a given item.</param>
     /// <param name="textSelector">Function that returns display text for a given item.</param>
     /// <param name="keySelector">Function that returns a stable key for a given item (used for expansion/selection stability).</param>
+    /// <param name="isExpandableSelector">
+    /// Optional function that determines whether an item can expand independently of its currently
+    /// loaded child count. When omitted, an item is expandable when its child collection is non-empty.
+    /// </param>
     public static TreeItemsView<T> Create<T>(
         IReadOnlyList<T> roots,
         Func<T, IReadOnlyList<T>> childrenSelector,
         Func<T, string>? textSelector = null,
-        Func<T, object?>? keySelector = null) =>
-        new(roots, childrenSelector, textSelector, keySelector);
+        Func<T, object?>? keySelector = null,
+        Func<T, bool>? isExpandableSelector = null) =>
+        new(roots, childrenSelector, textSelector, keySelector, isExpandableSelector);
 
     private sealed class EmptyTreeItemsView : ITreeItemsView
     {
@@ -105,44 +110,46 @@ public sealed class TreeItemsView<T> : ITreeItemsView
     private readonly Func<T, string> _textSelector;
     private readonly Func<T, object?> _keySelector;
     private readonly Func<object?, object?> _keySelectorObject;
+    private readonly Func<T, bool>? _isExpandableSelector;
 
     private readonly HashSet<object?> _expandedKeys = new();
     private readonly List<Entry> _visible = new();
+    private readonly HashSet<INotifyCollectionChanged> _subscribedChildCollections =
+        new(ReferenceEqualityComparer<INotifyCollectionChanged>.Instance);
+    private readonly HashSet<INotifyCollectionChanged> _requiredChildCollections =
+        new(ReferenceEqualityComparer<INotifyCollectionChanged>.Instance);
+    private readonly List<INotifyCollectionChanged> _removedChildCollections = new();
 
     private int _selectedIndex = -1;
     private object? _selectedKey;
+    private bool _isRefreshing;
+    private bool _refreshPending;
 
     public TreeItemsView(
         IReadOnlyList<T> roots,
         Func<T, IReadOnlyList<T>> childrenSelector,
         Func<T, string>? textSelector = null,
-        Func<T, object?>? keySelector = null)
+        Func<T, object?>? keySelector = null,
+        Func<T, bool>? isExpandableSelector = null)
     {
         Roots = roots ?? throw new ArgumentNullException(nameof(roots));
         _childrenSelector = childrenSelector ?? throw new ArgumentNullException(nameof(childrenSelector));
         _textSelector = textSelector ?? (t => t?.ToString() ?? string.Empty);
         _keySelector = keySelector ?? (t => t);
         _keySelectorObject = obj => obj is T t ? _keySelector(t) : null;
+        _isExpandableSelector = isExpandableSelector;
 
         RebuildVisible();
 
         if (roots is INotifyCollectionChanged ncc)
         {
-            NotifyCollectionChangedEventHandler? handler = null;
-            var weak = new WeakReference<TreeItemsView<T>>(this);
-            handler = (_, e) =>
-            {
-                if (!weak.TryGetTarget(out var self))
-                {
-                    ncc.CollectionChanged -= handler!;
-                    return;
-                }
-
-                // For now, treat any structural change as reset.
-                self.RebuildVisible();
-                self.Changed?.Invoke(new ItemsChange(ItemsChangeKind.Reset, 0, 0));
-            };
-            ncc.CollectionChanged += handler;
+            WeakEventManager.AddHandler<
+                INotifyCollectionChanged,
+                TreeItemsView<T>>(
+                CollectionWeakEvents.CollectionChanged,
+                ncc,
+                this,
+                static (view, _, _) => view.RefreshAndNotify());
         }
     }
 
@@ -264,8 +271,8 @@ public sealed class TreeItemsView<T> : ITreeItemsView
             return false;
         }
 
-        var children = _childrenSelector(_visible[index].Item);
-        return children != null && children.Count > 0;
+        var entry = _visible[index];
+        return _isExpandableSelector?.Invoke(entry.Item) ?? entry.Children.Count > 0;
     }
 
     /// <summary>
@@ -294,36 +301,50 @@ public sealed class TreeItemsView<T> : ITreeItemsView
         var key = _visible[index].Key;
         if (value)
         {
+            if (!GetHasChildren(index))
+            {
+                return;
+            }
+
             if (_expandedKeys.Add(key))
             {
-                RebuildVisible();
-                Changed?.Invoke(new ItemsChange(ItemsChangeKind.Reset, 0, 0));
+                RefreshAndNotify();
             }
         }
         else
         {
             if (_expandedKeys.Remove(key))
             {
-                RebuildVisible();
-                Changed?.Invoke(new ItemsChange(ItemsChangeKind.Reset, 0, 0));
+                RefreshAndNotify();
             }
         }
     }
 
-    public void Invalidate()
+    public void Invalidate() => RefreshAndNotify();
+
+    private void RefreshAndNotify()
     {
-        // Selection might need to be re-resolved when items move.
-        if (_selectedKey != null)
+        if (_isRefreshing)
         {
-            int idx = IndexOfKey(_selectedKey);
-            _selectedIndex = idx;
-        }
-        else
-        {
-            _selectedIndex = ItemsView.ClampIndex(_selectedIndex, Count);
+            _refreshPending = true;
+            return;
         }
 
-        Changed?.Invoke(new ItemsChange(ItemsChangeKind.Reset, 0, 0));
+        do
+        {
+            _refreshPending = false;
+            _isRefreshing = true;
+            try
+            {
+                RebuildVisible();
+                Changed?.Invoke(new ItemsChange(ItemsChangeKind.Reset, 0, 0));
+            }
+            finally
+            {
+                _isRefreshing = false;
+            }
+        }
+        while (_refreshPending);
     }
 
     private int IndexOfKey(object key)
@@ -342,10 +363,14 @@ public sealed class TreeItemsView<T> : ITreeItemsView
     private void RebuildVisible()
     {
         _visible.Clear();
+        _requiredChildCollections.Clear();
+
         for (int i = 0; i < Roots.Count; i++)
         {
             AddVisible(Roots[i], depth: 0);
         }
+
+        UpdateChildCollectionSubscriptions();
 
         // Clamp selection after rebuild (best-effort key match).
         if (_selectedKey != null)
@@ -361,15 +386,20 @@ public sealed class TreeItemsView<T> : ITreeItemsView
     private void AddVisible(T item, int depth)
     {
         var key = _keySelector(item);
-        _visible.Add(new Entry(item, key, depth));
+        var children = _childrenSelector(item) ?? Array.Empty<T>();
+        _visible.Add(new Entry(item, key, depth, children));
+
+        if (children is INotifyCollectionChanged observable)
+        {
+            _requiredChildCollections.Add(observable);
+        }
 
         if (!_expandedKeys.Contains(key))
         {
             return;
         }
 
-        var children = _childrenSelector(item);
-        if (children == null || children.Count == 0)
+        if (children.Count == 0)
         {
             return;
         }
@@ -380,7 +410,49 @@ public sealed class TreeItemsView<T> : ITreeItemsView
         }
     }
 
-    private readonly record struct Entry(T Item, object? Key, int Depth);
+    private void UpdateChildCollectionSubscriptions()
+    {
+        if (_subscribedChildCollections.Count > 0)
+        {
+            _removedChildCollections.Clear();
+            foreach (var collection in _subscribedChildCollections)
+            {
+                if (!_requiredChildCollections.Contains(collection))
+                {
+                    _removedChildCollections.Add(collection);
+                }
+            }
+
+            foreach (var collection in _removedChildCollections)
+            {
+                WeakEventManager.RemoveHandler(CollectionWeakEvents.CollectionChanged, collection, this);
+                _subscribedChildCollections.Remove(collection);
+            }
+        }
+
+        foreach (var collection in _requiredChildCollections)
+        {
+            if (_subscribedChildCollections.Contains(collection))
+            {
+                continue;
+            }
+
+            WeakEventManager.AddHandler<
+                INotifyCollectionChanged,
+                TreeItemsView<T>>(
+                CollectionWeakEvents.CollectionChanged,
+                collection,
+                this,
+                static (view, _, _) => view.RefreshAndNotify());
+            _subscribedChildCollections.Add(collection);
+        }
+    }
+
+    private readonly record struct Entry(
+        T Item,
+        object? Key,
+        int Depth,
+        IReadOnlyList<T> Children);
 }
 
 internal sealed class TreeViewNodeItemsView : ITreeItemsView
