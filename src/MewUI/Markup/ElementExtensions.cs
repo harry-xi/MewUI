@@ -5,11 +5,188 @@ namespace Aprillz.MewUI.Controls;
 /// </summary>
 public static class ElementExtensions
 {
+    #region Common Properties
+
+    /// <summary>
+    /// Sets whether the element participates in hit testing.
+    /// </summary>
+    /// <typeparam name="T">Element type.</typeparam>
+    /// <param name="element">Target element.</param>
+    /// <param name="value">Whether the element participates in hit testing.</param>
+    /// <returns>The element for chaining.</returns>
+    public static T IsHitTestVisible<T>(this T element, bool value = true) where T : UIElement
+    {
+        element.IsHitTestVisible = value;
+        return element;
+    }
+
+    /// <summary>
+    /// Sets whether viewport culling is skipped for the element.
+    /// </summary>
+    /// <typeparam name="T">Element type.</typeparam>
+    /// <param name="element">Target element.</param>
+    /// <param name="value">Whether viewport culling is skipped.</param>
+    /// <returns>The element for chaining.</returns>
+    public static T SkipViewportCull<T>(this T element, bool value = true) where T : UIElement
+    {
+        element.SkipViewportCull = value;
+        return element;
+    }
+
+    /// <summary>
+    /// Sets whether the element accepts drag-and-drop operations.
+    /// </summary>
+    /// <typeparam name="T">Element type.</typeparam>
+    /// <param name="element">Target element.</param>
+    /// <param name="value">Whether drop operations are accepted.</param>
+    /// <returns>The element for chaining.</returns>
+    public static T AllowDrop<T>(this T element, bool value = true) where T : UIElement
+    {
+        element.AllowDrop = value;
+        return element;
+    }
+
+    /// <summary>
+    /// Sets whether a drag operation can start from the element.
+    /// </summary>
+    /// <typeparam name="T">Element type.</typeparam>
+    /// <param name="element">Target element.</param>
+    /// <param name="value">Whether drag operations can start.</param>
+    /// <returns>The element for chaining.</returns>
+    public static T CanDrag<T>(this T element, bool value = true) where T : UIElement
+    {
+        element.CanDrag = value;
+        return element;
+    }
+
+    /// <summary>
+    /// Sets the application-defined tag.
+    /// </summary>
+    /// <typeparam name="T">Element type.</typeparam>
+    /// <param name="element">Target element.</param>
+    /// <param name="value">Tag value.</param>
+    /// <returns>The element for chaining.</returns>
+    public static T Tag<T>(this T element, object? value) where T : FrameworkElement
+    {
+        element.Tag = value;
+        return element;
+    }
+
+    /// <summary>
+    /// Sets the style sheet applied to the element.
+    /// </summary>
+    /// <typeparam name="T">Element type.</typeparam>
+    /// <param name="element">Target element.</param>
+    /// <param name="value">Style sheet.</param>
+    /// <returns>The element for chaining.</returns>
+    public static T StyleSheet<T>(this T element, StyleSheet? value) where T : FrameworkElement
+    {
+        element.StyleSheet = value;
+        return element;
+    }
+
+    /// <summary>
+    /// Adds a size change handler.
+    /// </summary>
+    /// <typeparam name="T">Element type.</typeparam>
+    /// <param name="element">Target element.</param>
+    /// <param name="handler">Event handler.</param>
+    /// <returns>The element for chaining.</returns>
+    public static T OnSizeChanged<T>(this T element, Action<SizeChangedEventArgs> handler)
+        where T : FrameworkElement
+    {
+        element.SizeChanged += handler;
+        return element;
+    }
+
+    /// <summary>
+    /// Adds a drag-enter handler.
+    /// </summary>
+    /// <typeparam name="T">Element type.</typeparam>
+    /// <param name="element">Target element.</param>
+    /// <param name="handler">Event handler.</param>
+    /// <returns>The element for chaining.</returns>
+    public static T OnDragEnter<T>(this T element, Action<DragEventArgs> handler) where T : UIElement
+    {
+        element.DragEnter += handler;
+        return element;
+    }
+
+    /// <summary>
+    /// Adds a drag-over handler.
+    /// </summary>
+    /// <typeparam name="T">Element type.</typeparam>
+    /// <param name="element">Target element.</param>
+    /// <param name="handler">Event handler.</param>
+    /// <returns>The element for chaining.</returns>
+    public static T OnDragOver<T>(this T element, Action<DragEventArgs> handler) where T : UIElement
+    {
+        element.DragOver += handler;
+        return element;
+    }
+
+    /// <summary>
+    /// Adds a drag-leave handler.
+    /// </summary>
+    /// <typeparam name="T">Element type.</typeparam>
+    /// <param name="element">Target element.</param>
+    /// <param name="handler">Event handler.</param>
+    /// <returns>The element for chaining.</returns>
+    public static T OnDragLeave<T>(this T element, Action<DragEventArgs> handler) where T : UIElement
+    {
+        element.DragLeave += handler;
+        return element;
+    }
+
+    /// <summary>
+    /// Adds a drop handler.
+    /// </summary>
+    /// <typeparam name="T">Element type.</typeparam>
+    /// <param name="element">Target element.</param>
+    /// <param name="handler">Event handler.</param>
+    /// <returns>The element for chaining.</returns>
+    public static T OnDrop<T>(this T element, Action<DragEventArgs> handler) where T : UIElement
+    {
+        element.Drop += handler;
+        return element;
+    }
+
+    /// <summary>
+    /// Adds a drag-starting handler.
+    /// </summary>
+    /// <typeparam name="T">Element type.</typeparam>
+    /// <param name="element">Target element.</param>
+    /// <param name="handler">Event handler.</param>
+    /// <returns>The element for chaining.</returns>
+    public static T OnDragStarting<T>(this T element, Action<DragStartingEventArgs> handler) where T : UIElement
+    {
+        element.DragStarting += handler;
+        return element;
+    }
+
+    /// <summary>
+    /// Adds a drag-completed handler.
+    /// </summary>
+    /// <typeparam name="T">Element type.</typeparam>
+    /// <param name="element">Target element.</param>
+    /// <param name="handler">Event handler.</param>
+    /// <returns>The element for chaining.</returns>
+    public static T OnDragCompleted<T>(this T element, Action<DragCompletedEventArgs> handler) where T : UIElement
+    {
+        element.DragCompleted += handler;
+        return element;
+    }
+
+    #endregion
+
     #region Size
 
     /// <summary>
     /// Not supported on <see cref="Window"/>. Use <see cref="Resizable"/>, <see cref="Fixed"/>, or the FitContent methods.
     /// </summary>
+    /// <param name="window">Target window.</param>
+    /// <param name="width">Unsupported width value.</param>
+    /// <returns>This method always throws.</returns>
     [Obsolete("Use .Resizable(w, h), .Fixed(w, h), or FitContent methods to set Window dimensions.", error: true)]
     public static Window Width(this Window window, double width)
         => throw new NotSupportedException("Use .Resizable(w, h), .Fixed(w, h), or FitContent methods to set Window dimensions.");
@@ -17,6 +194,9 @@ public static class ElementExtensions
     /// <summary>
     /// Not supported on <see cref="Window"/>. Use <see cref="Resizable"/>, <see cref="Fixed"/>, or the FitContent methods.
     /// </summary>
+    /// <param name="window">Target window.</param>
+    /// <param name="height">Unsupported height value.</param>
+    /// <returns>This method always throws.</returns>
     [Obsolete("Use .Resizable(w, h), .Fixed(w, h), or FitContent methods to set Window dimensions.", error: true)]
     public static Window Height(this Window window, double height)
         => throw new NotSupportedException("Use .Resizable(w, h), .Fixed(w, h), or FitContent methods to set Window dimensions.");
@@ -24,6 +204,10 @@ public static class ElementExtensions
     /// <summary>
     /// Not supported on <see cref="Window"/>. Use <see cref="Resizable"/>, <see cref="Fixed"/>, or the FitContent methods.
     /// </summary>
+    /// <param name="window">Target window.</param>
+    /// <param name="width">Unsupported width value.</param>
+    /// <param name="height">Unsupported height value.</param>
+    /// <returns>This method always throws.</returns>
     [Obsolete("Use .Resizable(w, h), .Fixed(w, h), or FitContent methods to set Window dimensions.", error: true)]
     public static Window Size(this Window window, double width, double height)
         => throw new NotSupportedException("Use .Resizable(w, h), .Fixed(w, h), or FitContent methods to set Window dimensions.");
@@ -31,6 +215,9 @@ public static class ElementExtensions
     /// <summary>
     /// Not supported on <see cref="Window"/>. Use <see cref="Resizable"/>, <see cref="Fixed"/>, or the FitContent methods.
     /// </summary>
+    /// <param name="window">Target window.</param>
+    /// <param name="size">Unsupported size value.</param>
+    /// <returns>This method always throws.</returns>
     [Obsolete("Use .Resizable(w, h), .Fixed(w, h), or FitContent methods to set Window dimensions.", error: true)]
     public static Window Size(this Window window, double size)
         => throw new NotSupportedException("Use .Resizable(w, h), .Fixed(w, h), or FitContent methods to set Window dimensions.");
@@ -38,6 +225,7 @@ public static class ElementExtensions
     /// <summary>
     /// Sets the window as resizable with optional min/max constraints.
     /// </summary>
+    /// <typeparam name="TWindow">Window type.</typeparam>
     /// <param name="window">Target window.</param>
     /// <param name="width">Width value.</param>
     /// <param name="height">Height value.</param>
@@ -57,6 +245,7 @@ public static class ElementExtensions
     /// <summary>
     /// Sets the window as fixed size.
     /// </summary>
+    /// <typeparam name="TWindow">Window type.</typeparam>
     /// <param name="window">Target window.</param>
     /// <param name="width">Width value.</param>
     /// <param name="height">Height value.</param>
@@ -70,6 +259,7 @@ public static class ElementExtensions
     /// <summary>
     /// Sets the window to fit content width.
     /// </summary>
+    /// <typeparam name="TWindow">Window type.</typeparam>
     /// <param name="window">Target window.</param>
     /// <param name="fixedHeight">Fixed height.</param>
     /// <param name="maxWidth">Maximum width.</param>
@@ -83,6 +273,7 @@ public static class ElementExtensions
     /// <summary>
     /// Sets the window to fit content height.
     /// </summary>
+    /// <typeparam name="TWindow">Window type.</typeparam>
     /// <param name="window">Target window.</param>
     /// <param name="fixedWidth">Fixed width.</param>
     /// <param name="maxHeight">Maximum height.</param>
@@ -96,6 +287,7 @@ public static class ElementExtensions
     /// <summary>
     /// Sets the window to fit content size.
     /// </summary>
+    /// <typeparam name="TWindow">Window type.</typeparam>
     /// <param name="window">Target window.</param>
     /// <param name="maxWidth">Maximum width.</param>
     /// <param name="maxHeight">Maximum height.</param>
@@ -109,6 +301,9 @@ public static class ElementExtensions
     /// <summary>
     /// Sets the window to open centered on the primary screen. Must be called before <see cref="Window.Show"/>.
     /// </summary>
+    /// <typeparam name="TWindow">Window type.</typeparam>
+    /// <param name="window">Target window.</param>
+    /// <returns>The window for chaining.</returns>
     /// <remarks>
     /// Do not call inside <c>OnBuild</c> — setting startup position after the window is shown throws an exception.
     /// </remarks>
@@ -122,6 +317,8 @@ public static class ElementExtensions
     /// Sets the window to open centered on the owner window.
     /// The owner is provided when calling <see cref="Window.Show(Window?)"/> or <see cref="Window.ShowDialogAsync(Window?)"/>.
     /// </summary>
+    /// <param name="window">Target window.</param>
+    /// <returns>The window for chaining.</returns>
     /// <remarks>
     /// Do not call inside <c>OnBuild</c> — setting startup position after the window is shown throws an exception.
     /// </remarks>
@@ -135,6 +332,10 @@ public static class ElementExtensions
     /// Sets the window to open at the specified position in DIPs (primary monitor DPI basis).
     /// Must be called before <see cref="Window.Show"/>.
     /// </summary>
+    /// <param name="window">Target window.</param>
+    /// <param name="leftDip">Left position in DIPs.</param>
+    /// <param name="topDip">Top position in DIPs.</param>
+    /// <returns>The window for chaining.</returns>
     /// <remarks>
     /// Do not call inside <c>OnBuild</c> — setting startup position after the window is shown throws an exception.
     /// </remarks>
@@ -148,6 +349,10 @@ public static class ElementExtensions
     /// <summary>
     /// Subscribes to <see cref="Window.WindowStateChanged"/>.
     /// </summary>
+    /// <typeparam name="T">Window type.</typeparam>
+    /// <param name="window">Target window.</param>
+    /// <param name="handler">Event handler.</param>
+    /// <returns>The window for chaining.</returns>
     public static T OnWindowStateChanged<T>(this T window, Action<WindowState> handler) where T : Window
     {
         window.WindowStateChanged += handler;
@@ -157,6 +362,10 @@ public static class ElementExtensions
     /// <summary>
     /// Sets the window opacity (0.0 – 1.0).
     /// </summary>
+    /// <typeparam name="T">Window type.</typeparam>
+    /// <param name="window">Target window.</param>
+    /// <param name="opacity">Window opacity.</param>
+    /// <returns>The window for chaining.</returns>
     public static T Opacity<T>(this T window, double opacity) where T : Window
     {
         window.Opacity = opacity;
@@ -166,6 +375,10 @@ public static class ElementExtensions
     /// <summary>
     /// Sets the window as topmost.
     /// </summary>
+    /// <typeparam name="T">Window type.</typeparam>
+    /// <param name="window">Target window.</param>
+    /// <param name="topmost">Whether the window is topmost.</param>
+    /// <returns>The window for chaining.</returns>
     public static T Topmost<T>(this T window, bool topmost = true) where T : Window
     {
         window.Topmost = topmost;
@@ -173,26 +386,168 @@ public static class ElementExtensions
     }
 
     /// <summary>
+    /// Sets whether the window uses tool-window behavior.
+    /// </summary>
+    /// <typeparam name="T">Window type.</typeparam>
+    /// <param name="window">Target window.</param>
+    /// <param name="value">Whether tool-window behavior is enabled.</param>
+    /// <returns>The window for chaining.</returns>
+    public static T IsToolWindow<T>(this T window, bool value = true) where T : Window
+    {
+        window.IsToolWindow = value;
+        return window;
+    }
+
+    /// <summary>
+    /// Sets whether the window allows transparent content.
+    /// </summary>
+    /// <typeparam name="T">Window type.</typeparam>
+    /// <param name="window">Target window.</param>
+    /// <param name="value">Whether transparent content is allowed.</param>
+    /// <returns>The window for chaining.</returns>
+    public static T AllowsTransparency<T>(this T window, bool value = true) where T : Window
+    {
+        window.AllowsTransparency = value;
+        return window;
+    }
+
+    /// <summary>
+    /// Sets the height of the title bar extended into the client area.
+    /// </summary>
+    /// <typeparam name="T">Window type.</typeparam>
+    /// <param name="window">Target window.</param>
+    /// <param name="value">Extended title bar height.</param>
+    /// <returns>The window for chaining.</returns>
+    public static T ExtendClientAreaTitleBarHeight<T>(this T window, double value) where T : Window
+    {
+        window.ExtendClientAreaTitleBarHeight = value;
+        return window;
+    }
+
+    /// <summary>
+    /// Sets platform-specific window options.
+    /// </summary>
+    /// <typeparam name="T">Window type.</typeparam>
+    /// <param name="window">Target window.</param>
+    /// <param name="value">Platform-specific options.</param>
+    /// <returns>The window for chaining.</returns>
+    public static T PlatformOptions<T>(this T window, PlatformWindowOptions? value) where T : Window
+    {
+        window.PlatformOptions = value;
+        return window;
+    }
+
+    /// <summary>
+    /// Sets the window state.
+    /// </summary>
+    /// <typeparam name="T">Window type.</typeparam>
+    /// <param name="window">Target window.</param>
+    /// <param name="value">Window state.</param>
+    /// <returns>The window for chaining.</returns>
+    public static T WindowState<T>(
+        this T window,
+        global::Aprillz.MewUI.Controls.WindowState value)
+        where T : Window
+    {
+        window.WindowState = value;
+        return window;
+    }
+
+    /// <summary>
+    /// Sets whether the window can be minimized.
+    /// </summary>
+    /// <typeparam name="T">Window type.</typeparam>
+    /// <param name="window">Target window.</param>
+    /// <param name="value">Whether the window can be minimized.</param>
+    /// <returns>The window for chaining.</returns>
+    public static T CanMinimize<T>(this T window, bool value = true) where T : Window
+    {
+        window.CanMinimize = value;
+        return window;
+    }
+
+    /// <summary>
+    /// Sets whether the window can be maximized.
+    /// </summary>
+    /// <typeparam name="T">Window type.</typeparam>
+    /// <param name="window">Target window.</param>
+    /// <param name="value">Whether the window can be maximized.</param>
+    /// <returns>The window for chaining.</returns>
+    public static T CanMaximize<T>(this T window, bool value = true) where T : Window
+    {
+        window.CanMaximize = value;
+        return window;
+    }
+
+    /// <summary>
+    /// Sets whether the window can be closed.
+    /// </summary>
+    /// <typeparam name="T">Window type.</typeparam>
+    /// <param name="window">Target window.</param>
+    /// <param name="value">Whether the window can be closed.</param>
+    /// <returns>The window for chaining.</returns>
+    public static T CanClose<T>(this T window, bool value = true) where T : Window
+    {
+        window.CanClose = value;
+        return window;
+    }
+
+    /// <summary>
+    /// Sets whether the window appears in the taskbar.
+    /// </summary>
+    /// <typeparam name="T">Window type.</typeparam>
+    /// <param name="window">Target window.</param>
+    /// <param name="value">Whether the window appears in the taskbar.</param>
+    /// <returns>The window for chaining.</returns>
+    public static T ShowInTaskbar<T>(this T window, bool value = true) where T : Window
+    {
+        window.ShowInTaskbar = value;
+        return window;
+    }
+
+    /// <summary>
+    /// Sets whether layout values are rounded to device pixels.
+    /// </summary>
+    /// <typeparam name="T">Window type.</typeparam>
+    /// <param name="window">Target window.</param>
+    /// <param name="value">Whether layout rounding is enabled.</param>
+    /// <returns>The window for chaining.</returns>
+    public static T UseLayoutRounding<T>(this T window, bool value = true) where T : Window
+    {
+        window.UseLayoutRounding = value;
+        return window;
+    }
+
+    /// <summary>
     /// Sets the window state to minimized.
     /// </summary>
+    /// <typeparam name="T">Window type.</typeparam>
+    /// <param name="window">Target window.</param>
+    /// <returns>The window for chaining.</returns>
     public static T Minimized<T>(this T window) where T : Window
     {
-        window.WindowState = WindowState.Minimized;
+        window.WindowState = global::Aprillz.MewUI.Controls.WindowState.Minimized;
         return window;
     }
 
     /// <summary>
     /// Sets the window state to maximized.
     /// </summary>
+    /// <typeparam name="T">Window type.</typeparam>
+    /// <param name="window">Target window.</param>
+    /// <returns>The window for chaining.</returns>
     public static T Maximized<T>(this T window) where T : Window
     {
-        window.WindowState = WindowState.Maximized;
+        window.WindowState = global::Aprillz.MewUI.Controls.WindowState.Maximized;
         return window;
     }
 
     /// <summary>
     /// Not supported on <see cref="Window"/>. Use <see cref="Resizable"/> or assign <see cref="Window.WindowSize"/> directly.
     /// </summary>
+    /// <param name="window">Target window.</param>
+    /// <param name="minWidth">Unsupported minimum width.</param>
+    /// <returns>This method always throws.</returns>
     [Obsolete("Use .Resizable(w, h, minWidth: ...) or assign WindowSize directly.", error: true)]
     public static Window MinWidth(this Window window, double minWidth)
         => throw new NotSupportedException("Use .Resizable(w, h, minWidth: ...) or assign WindowSize directly.");
@@ -200,6 +555,9 @@ public static class ElementExtensions
     /// <summary>
     /// Not supported on <see cref="Window"/>. Use <see cref="Resizable"/> or assign <see cref="Window.WindowSize"/> directly.
     /// </summary>
+    /// <param name="window">Target window.</param>
+    /// <param name="minHeight">Unsupported minimum height.</param>
+    /// <returns>This method always throws.</returns>
     [Obsolete("Use .Resizable(w, h, minHeight: ...) or assign WindowSize directly.", error: true)]
     public static Window MinHeight(this Window window, double minHeight)
         => throw new NotSupportedException("Use .Resizable(w, h, minHeight: ...) or assign WindowSize directly.");
@@ -207,6 +565,9 @@ public static class ElementExtensions
     /// <summary>
     /// Not supported on <see cref="Window"/>. Use <see cref="Resizable"/> or assign <see cref="Window.WindowSize"/> directly.
     /// </summary>
+    /// <param name="window">Target window.</param>
+    /// <param name="maxWidth">Unsupported maximum width.</param>
+    /// <returns>This method always throws.</returns>
     [Obsolete("Use .Resizable(w, h, maxWidth: ...) or assign WindowSize directly.", error: true)]
     public static Window MaxWidth(this Window window, double maxWidth)
         => throw new NotSupportedException("Use .Resizable(w, h, maxWidth: ...) or assign WindowSize directly.");
@@ -214,6 +575,9 @@ public static class ElementExtensions
     /// <summary>
     /// Not supported on <see cref="Window"/>. Use <see cref="Resizable"/> or assign <see cref="Window.WindowSize"/> directly.
     /// </summary>
+    /// <param name="window">Target window.</param>
+    /// <param name="maxHeight">Unsupported maximum height.</param>
+    /// <returns>This method always throws.</returns>
     [Obsolete("Use .Resizable(w, h, maxHeight: ...) or assign WindowSize directly.", error: true)]
     public static Window MaxHeight(this Window window, double maxHeight)
         => throw new NotSupportedException("Use .Resizable(w, h, maxHeight: ...) or assign WindowSize directly.");
@@ -637,6 +1001,14 @@ public static class ElementExtensions
 
     #region Template
 
+    /// <summary>
+    /// Registers an element by name in a template context.
+    /// </summary>
+    /// <typeparam name="T">Element type.</typeparam>
+    /// <param name="control">Element to register.</param>
+    /// <param name="ctx">Template context.</param>
+    /// <param name="name">Registration name.</param>
+    /// <returns>The element for chaining.</returns>
     public static T Register<T>(this T control, TemplateContext ctx, string name) where T : UIElement
     {
         ArgumentNullException.ThrowIfNull(control);
@@ -860,6 +1232,10 @@ public static class ElementExtensions
     /// <summary>
     /// Sets the style name for named style resolution from the nearest <see cref="StyleSheet"/>.
     /// </summary>
+    /// <typeparam name="T">Control type.</typeparam>
+    /// <param name="control">Target control.</param>
+    /// <param name="name">Style name.</param>
+    /// <returns>The control for chaining.</returns>
     public static T StyleName<T>(this T control, string name) where T : Control
     {
         control.StyleName = name;

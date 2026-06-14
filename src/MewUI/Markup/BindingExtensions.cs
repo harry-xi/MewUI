@@ -9,6 +9,13 @@ public static class BindingExtensions
     /// Binds a <see cref="MewProperty{T}"/> to an <see cref="ObservableValue{T}"/>
     /// and returns the element for fluent chaining.
     /// </summary>
+    /// <typeparam name="TElement">Target object type.</typeparam>
+    /// <typeparam name="T">Property value type.</typeparam>
+    /// <param name="element">Target object.</param>
+    /// <param name="property">Target property.</param>
+    /// <param name="source">Observable source.</param>
+    /// <param name="mode">Optional binding mode.</param>
+    /// <returns>The target object for chaining.</returns>
     public static TElement Bind<TElement, T>(this TElement element,
         MewProperty<T> property, ObservableValue<T> source,
         BindingMode? mode = null)
@@ -22,6 +29,13 @@ public static class BindingExtensions
     /// Binds a <see cref="MewProperty{T}"/> to another <see cref="MewObject"/>'s <see cref="MewProperty{T}"/>
     /// and returns the element for fluent chaining.
     /// </summary>
+    /// <typeparam name="TElement">Target object type.</typeparam>
+    /// <typeparam name="T">Property value type.</typeparam>
+    /// <param name="element">Target object.</param>
+    /// <param name="property">Target property.</param>
+    /// <param name="source">Source object.</param>
+    /// <param name="sourceProperty">Source property.</param>
+    /// <returns>The target object for chaining.</returns>
     public static TElement Bind<TElement, T>(this TElement element,
         MewProperty<T> property, MewObject source, MewProperty<T> sourceProperty)
         where TElement : MewObject
@@ -34,6 +48,16 @@ public static class BindingExtensions
     /// Binds a <see cref="MewProperty{TProp}"/> to an <see cref="ObservableValue{TSource}"/>
     /// with type conversion and returns the element for fluent chaining.
     /// </summary>
+    /// <typeparam name="TElement">Target object type.</typeparam>
+    /// <typeparam name="TProp">Target property value type.</typeparam>
+    /// <typeparam name="TSource">Source value type.</typeparam>
+    /// <param name="element">Target object.</param>
+    /// <param name="property">Target property.</param>
+    /// <param name="source">Observable source.</param>
+    /// <param name="convert">Source-to-target converter.</param>
+    /// <param name="convertBack">Optional target-to-source converter.</param>
+    /// <param name="mode">Optional binding mode.</param>
+    /// <returns>The target object for chaining.</returns>
     public static TElement Bind<TElement, TProp, TSource>(this TElement element,
         MewProperty<TProp> property,
         ObservableValue<TSource> source,
@@ -50,6 +74,17 @@ public static class BindingExtensions
     /// Binds a <see cref="MewProperty{TProp}"/> to another <see cref="MewObject"/>'s <see cref="MewProperty{TSource}"/>
     /// with type conversion and returns the element for fluent chaining.
     /// </summary>
+    /// <typeparam name="TElement">Target object type.</typeparam>
+    /// <typeparam name="TProp">Target property value type.</typeparam>
+    /// <typeparam name="TSource">Source property value type.</typeparam>
+    /// <param name="element">Target object.</param>
+    /// <param name="property">Target property.</param>
+    /// <param name="source">Source object.</param>
+    /// <param name="sourceProperty">Source property.</param>
+    /// <param name="convert">Source-to-target converter.</param>
+    /// <param name="convertBack">Optional target-to-source converter.</param>
+    /// <param name="mode">Optional binding mode.</param>
+    /// <returns>The target object for chaining.</returns>
     public static TElement Bind<TElement, TProp, TSource>(this TElement element,
         MewProperty<TProp> property,
         MewObject source, MewProperty<TSource> sourceProperty,

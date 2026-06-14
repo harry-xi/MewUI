@@ -45,6 +45,42 @@ public static class GridViewExtensions
     }
 
     /// <summary>
+    /// Sets the maximum automatically sized viewport height.
+    /// </summary>
+    /// <param name="gridView">Target grid view.</param>
+    /// <param name="value">Maximum viewport height in DIPs.</param>
+    /// <returns>The grid view for chaining.</returns>
+    public static GridView MaxAutoViewportHeight(this GridView gridView, double value)
+    {
+        gridView.MaxAutoViewportHeight = value;
+        return gridView;
+    }
+
+    /// <summary>
+    /// Sets the selected row index.
+    /// </summary>
+    /// <param name="gridView">Target grid view.</param>
+    /// <param name="value">Selected row index.</param>
+    /// <returns>The grid view for chaining.</returns>
+    public static GridView SelectedIndex(this GridView gridView, int value)
+    {
+        gridView.SelectedIndex = value;
+        return gridView;
+    }
+
+    /// <summary>
+    /// Adds a selection change handler.
+    /// </summary>
+    /// <param name="gridView">Target grid view.</param>
+    /// <param name="handler">Event handler.</param>
+    /// <returns>The grid view for chaining.</returns>
+    public static GridView OnSelectionChanged(this GridView gridView, Action<object?> handler)
+    {
+        gridView.SelectionChanged += handler;
+        return gridView;
+    }
+
+    /// <summary>
     /// Enables or disables zebra striping.
     /// </summary>
     /// <param name="gridView">Target grid view.</param>
@@ -264,6 +300,33 @@ public static class GridViewExtensions
     {
         ArgumentNullException.ThrowIfNull(column);
         column.IsResizable = resizable;
+        return column;
+    }
+
+    /// <summary>
+    /// Sets whether the column can be resized.
+    /// </summary>
+    /// <typeparam name="TItem">Item type.</typeparam>
+    /// <param name="column">Target column.</param>
+    /// <param name="value">Whether the column can be resized.</param>
+    /// <returns>The column for chaining.</returns>
+    public static GridViewColumn<TItem> IsResizable<TItem>(
+        this GridViewColumn<TItem> column,
+        bool value = true)
+        => column.Resizable(value);
+
+    /// <summary>
+    /// Sets the column cell template.
+    /// </summary>
+    /// <typeparam name="TItem">Item type.</typeparam>
+    /// <param name="column">Target column.</param>
+    /// <param name="template">Cell template.</param>
+    /// <returns>The column for chaining.</returns>
+    public static GridViewColumn<TItem> CellTemplate<TItem>(
+        this GridViewColumn<TItem> column,
+        IDataTemplate<TItem>? template)
+    {
+        column.CellTemplate = template;
         return column;
     }
 

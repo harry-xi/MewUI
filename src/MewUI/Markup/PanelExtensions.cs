@@ -7,6 +7,19 @@ namespace Aprillz.MewUI;
 /// </summary>
 public static class PanelExtensions
 {
+    /// <summary>
+    /// Sets whether child content is clipped to the panel bounds.
+    /// </summary>
+    /// <typeparam name="T">Panel type.</typeparam>
+    /// <param name="panel">Target panel.</param>
+    /// <param name="value">Whether child content is clipped.</param>
+    /// <returns>The panel for chaining.</returns>
+    public static T ClipToBounds<T>(this T panel, bool value = true) where T : Panel
+    {
+        panel.ClipToBounds = value;
+        return panel;
+    }
+
     #region Panel Base
 
     /// <summary>
@@ -224,12 +237,24 @@ public static class PanelExtensions
         return grid;
     }
 
+    /// <summary>
+    /// Sets whether grid lines are shown.
+    /// </summary>
+    /// <param name="grid">Target grid.</param>
+    /// <param name="showGridLine">Whether grid lines are shown.</param>
+    /// <returns>The grid for chaining.</returns>
     public static Grid ShowGridLine(this Grid grid, bool showGridLine = true)
     {
         grid.ShowGridLine = showGridLine;
         return grid;
     }
 
+    /// <summary>
+    /// Sets whether star-sized rows and columns share available space.
+    /// </summary>
+    /// <param name="grid">Target grid.</param>
+    /// <param name="shareStarSize">Whether star sizes are shared.</param>
+    /// <returns>The grid for chaining.</returns>
     public static Grid ShareStarSize(this Grid grid, bool shareStarSize = true)
     {
         grid.ShareStarSize = shareStarSize;

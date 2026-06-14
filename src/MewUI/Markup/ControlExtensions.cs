@@ -136,6 +136,19 @@ public static class ControlExtensions
     }
 
     /// <summary>
+    /// Sets the tooltip content.
+    /// </summary>
+    /// <typeparam name="T">Control type.</typeparam>
+    /// <param name="control">Target control.</param>
+    /// <param name="content">Tooltip content.</param>
+    /// <returns>The control for chaining.</returns>
+    public static T ToolTip<T>(this T control, Element? content) where T : Control
+    {
+        control.ToolTip = content;
+        return control;
+    }
+
+    /// <summary>
     /// Sets the context menu.
     /// </summary>
     /// <typeparam name="T">Control type.</typeparam>
@@ -511,6 +524,7 @@ public static class ControlExtensions
     /// <summary>
     /// Sets the corner radius.
     /// </summary>
+    /// <typeparam name="T">Control type.</typeparam>
     /// <param name="control">Target control.</param>
     /// <param name="radius">Corner radius.</param>
     /// <returns>The control for chaining.</returns>
@@ -545,6 +559,30 @@ public static class ControlExtensions
     {
         ArgumentNullException.ThrowIfNull(border);
         border.ClipToBounds = clip;
+        return border;
+    }
+
+    /// <summary>
+    /// Sets the per-edge border thickness.
+    /// </summary>
+    /// <param name="border">Target border.</param>
+    /// <param name="thickness">Per-edge border thickness.</param>
+    /// <returns>The border for chaining.</returns>
+    public static Border BorderThickness(this Border border, Thickness thickness)
+    {
+        border.NonUniformBorderThickness = thickness;
+        return border;
+    }
+
+    /// <summary>
+    /// Sets the per-corner radius.
+    /// </summary>
+    /// <param name="border">Target border.</param>
+    /// <param name="cornerRadius">Per-corner radius.</param>
+    /// <returns>The border for chaining.</returns>
+    public static Border CornerRadius(this Border border, CornerRadius cornerRadius)
+    {
+        border.NonUniformCornerRadius = cornerRadius;
         return border;
     }
 
@@ -643,6 +681,9 @@ public static class ControlExtensions
     /// <summary>
     /// Sets the header inset.
     /// </summary>
+    /// <param name="groupBox">Target group box.</param>
+    /// <param name="inset">Header inset.</param>
+    /// <returns>The group box for chaining.</returns>
     public static GroupBox HeaderInset(this GroupBox groupBox, double inset)
     {
         ArgumentNullException.ThrowIfNull(groupBox);
@@ -657,6 +698,9 @@ public static class ControlExtensions
     /// <summary>
     /// Sets the expanded state.
     /// </summary>
+    /// <param name="expander">Target expander.</param>
+    /// <param name="expanded">Expanded state.</param>
+    /// <returns>The expander for chaining.</returns>
     public static Expander IsExpanded(this Expander expander, bool expanded)
     {
         ArgumentNullException.ThrowIfNull(expander);
@@ -667,6 +711,9 @@ public static class ControlExtensions
     /// <summary>
     /// Binds the expanded state to an observable value.
     /// </summary>
+    /// <param name="expander">Target expander.</param>
+    /// <param name="source">Observable source.</param>
+    /// <returns>The expander for chaining.</returns>
     public static Expander BindIsExpanded(this Expander expander, ObservableValue<bool> source)
     {
         ArgumentNullException.ThrowIfNull(expander);
@@ -675,8 +722,34 @@ public static class ControlExtensions
     }
 
     /// <summary>
+    /// Binds the expanded state to a converted observable value.
+    /// </summary>
+    /// <typeparam name="TSource">Source value type.</typeparam>
+    /// <param name="expander">Target expander.</param>
+    /// <param name="source">Observable source.</param>
+    /// <param name="convert">Source-to-expanded-state converter.</param>
+    /// <param name="convertBack">Optional expanded-state-to-source converter.</param>
+    /// <returns>The expander for chaining.</returns>
+    public static Expander BindIsExpanded<TSource>(
+        this Expander expander,
+        ObservableValue<TSource> source,
+        Func<TSource, bool> convert,
+        Func<bool, TSource>? convertBack = null)
+    {
+        ArgumentNullException.ThrowIfNull(expander);
+        ArgumentNullException.ThrowIfNull(source);
+        ArgumentNullException.ThrowIfNull(convert);
+
+        expander.SetBinding(Expander.IsExpandedProperty, source, convert, convertBack);
+        return expander;
+    }
+
+    /// <summary>
     /// Sets the chevron glyph size.
     /// </summary>
+    /// <param name="expander">Target expander.</param>
+    /// <param name="size">Glyph size.</param>
+    /// <returns>The expander for chaining.</returns>
     public static Expander GlyphSize(this Expander expander, double size)
     {
         ArgumentNullException.ThrowIfNull(expander);
@@ -687,6 +760,9 @@ public static class ControlExtensions
     /// <summary>
     /// Registers an expanded state change handler.
     /// </summary>
+    /// <param name="expander">Target expander.</param>
+    /// <param name="handler">Event handler.</param>
+    /// <returns>The expander for chaining.</returns>
     public static Expander OnExpandedChanged(this Expander expander, Action<bool> handler)
     {
         ArgumentNullException.ThrowIfNull(expander);
@@ -717,6 +793,18 @@ public static class ControlExtensions
     /// <param name="target">Element to focus on access key activation.</param>
     /// <returns>The label for chaining.</returns>
     public static Label AccessKeyTarget(this Label label, UIElement target)
+    {
+        label.Target = target;
+        return label;
+    }
+
+    /// <summary>
+    /// Sets the element targeted by the label's access key.
+    /// </summary>
+    /// <param name="label">Target label.</param>
+    /// <param name="target">Element to focus on access key activation.</param>
+    /// <returns>The label for chaining.</returns>
+    public static Label Target(this Label label, UIElement? target)
     {
         label.Target = target;
         return label;
@@ -810,6 +898,7 @@ public static class ControlExtensions
     /// <summary>
     /// Sets the text.
     /// </summary>
+    /// <typeparam name="T">Text block type.</typeparam>
     /// <param name="textBlock">Target text block.</param>
     /// <param name="text">Text content.</param>
     /// <returns>The text block for chaining.</returns>
@@ -819,36 +908,70 @@ public static class ControlExtensions
         return textBlock;
     }
 
+    /// <summary>
+    /// Sets the foreground color.
+    /// </summary>
+    /// <param name="textBlock">Target text block.</param>
+    /// <param name="color">Foreground color.</param>
+    /// <returns>The text block for chaining.</returns>
     public static TextBlock Foreground(this TextBlock textBlock, Color color)
     {
         textBlock.Foreground = color;
         return textBlock;
     }
 
+    /// <summary>
+    /// Sets the font family.
+    /// </summary>
+    /// <param name="textBlock">Target text block.</param>
+    /// <param name="fontFamily">Font family name.</param>
+    /// <returns>The text block for chaining.</returns>
     public static TextBlock FontFamily(this TextBlock textBlock, string fontFamily)
     {
         textBlock.FontFamily = fontFamily;
         return textBlock;
     }
 
+    /// <summary>
+    /// Sets the font size.
+    /// </summary>
+    /// <param name="textBlock">Target text block.</param>
+    /// <param name="fontSize">Font size.</param>
+    /// <returns>The text block for chaining.</returns>
     public static TextBlock FontSize(this TextBlock textBlock, double fontSize)
     {
         textBlock.FontSize = fontSize;
         return textBlock;
     }
 
+    /// <summary>
+    /// Sets the font weight.
+    /// </summary>
+    /// <param name="textBlock">Target text block.</param>
+    /// <param name="fontWeight">Font weight.</param>
+    /// <returns>The text block for chaining.</returns>
     public static TextBlock FontWeight(this TextBlock textBlock, FontWeight fontWeight)
     {
         textBlock.FontWeight = fontWeight;
         return textBlock;
     }
 
+    /// <summary>
+    /// Sets the font weight to bold.
+    /// </summary>
+    /// <param name="textBlock">Target text block.</param>
+    /// <returns>The text block for chaining.</returns>
     public static TextBlock Bold(this TextBlock textBlock)
     {
         textBlock.FontWeight = MewUI.FontWeight.Bold;
         return textBlock;
     }
 
+    /// <summary>
+    /// Sets the font weight to semi-bold.
+    /// </summary>
+    /// <param name="textBlock">Target text block.</param>
+    /// <returns>The text block for chaining.</returns>
     public static TextBlock SemiBold(this TextBlock textBlock)
     {
         textBlock.FontWeight = MewUI.FontWeight.SemiBold;
@@ -858,6 +981,10 @@ public static class ControlExtensions
     /// <summary>
     /// Sets the text alignment.
     /// </summary>
+    /// <typeparam name="T">Text block type.</typeparam>
+    /// <param name="textBlock">Target text block.</param>
+    /// <param name="alignment">Text alignment.</param>
+    /// <returns>The text block for chaining.</returns>
     public static T TextAlignment<T>(this T textBlock, TextAlignment alignment) where T : TextBlock
     {
         textBlock.TextAlignment = alignment;
@@ -867,6 +994,10 @@ public static class ControlExtensions
     /// <summary>
     /// Sets the vertical text alignment.
     /// </summary>
+    /// <typeparam name="T">Text block type.</typeparam>
+    /// <param name="textBlock">Target text block.</param>
+    /// <param name="alignment">Vertical text alignment.</param>
+    /// <returns>The text block for chaining.</returns>
     public static T VerticalTextAlignment<T>(this T textBlock, TextAlignment alignment) where T : TextBlock
     {
         textBlock.VerticalTextAlignment = alignment;
@@ -876,6 +1007,10 @@ public static class ControlExtensions
     /// <summary>
     /// Sets the text wrapping mode.
     /// </summary>
+    /// <typeparam name="T">Text block type.</typeparam>
+    /// <param name="textBlock">Target text block.</param>
+    /// <param name="wrapping">Text wrapping mode.</param>
+    /// <returns>The text block for chaining.</returns>
     public static T TextWrapping<T>(this T textBlock, TextWrapping wrapping) where T : TextBlock
     {
         textBlock.TextWrapping = wrapping;
@@ -885,6 +1020,10 @@ public static class ControlExtensions
     /// <summary>
     /// Sets the text trimming mode.
     /// </summary>
+    /// <typeparam name="T">Text block type.</typeparam>
+    /// <param name="textBlock">Target text block.</param>
+    /// <param name="trimming">Text trimming mode.</param>
+    /// <returns>The text block for chaining.</returns>
     public static T TextTrimming<T>(this T textBlock, TextTrimming trimming) where T : TextBlock
     {
         textBlock.TextTrimming = trimming;
@@ -894,6 +1033,10 @@ public static class ControlExtensions
     /// <summary>
     /// Binds the text to an observable value.
     /// </summary>
+    /// <typeparam name="T">Text block type.</typeparam>
+    /// <param name="textBlock">Target text block.</param>
+    /// <param name="source">Observable source.</param>
+    /// <returns>The text block for chaining.</returns>
     public static T BindText<T>(this T textBlock, ObservableValue<string> source) where T : TextBlock
     {
         ArgumentNullException.ThrowIfNull(textBlock);
@@ -906,6 +1049,12 @@ public static class ControlExtensions
     /// <summary>
     /// Binds the text to an observable value with converter.
     /// </summary>
+    /// <typeparam name="T">Text block type.</typeparam>
+    /// <typeparam name="TSource">Source value type.</typeparam>
+    /// <param name="textBlock">Target text block.</param>
+    /// <param name="source">Observable source.</param>
+    /// <param name="convert">Conversion function.</param>
+    /// <returns>The text block for chaining.</returns>
     public static T BindText<T, TSource>(this T textBlock, ObservableValue<TSource> source, Func<TSource, string> convert) where T : TextBlock
     {
         ArgumentNullException.ThrowIfNull(textBlock);
@@ -982,6 +1131,10 @@ public static class ControlExtensions
     /// Sets the button content to a centered text label. When <paramref name="accessKey"/> is true (default),
     /// "_" prefixes mark access key characters (e.g., "_Save" registers Alt+S).
     /// </summary>
+    /// <param name="button">Target button.</param>
+    /// <param name="text">Content text.</param>
+    /// <param name="accessKey">Whether underscore prefixes define access keys.</param>
+    /// <returns>The button for chaining.</returns>
     public static Button Content(this Button button, string text, bool accessKey = true)
     {
         if (accessKey)
@@ -1013,6 +1166,9 @@ public static class ControlExtensions
     /// <summary>
     /// Binds the button content to an observable string value (creates a centered TextBlock).
     /// </summary>
+    /// <param name="button">Target button.</param>
+    /// <param name="source">Observable source.</param>
+    /// <returns>The button for chaining.</returns>
     public static Button BindContent(this Button button, ObservableValue<string> source)
     {
         var tb = new TextBlock
@@ -1030,6 +1186,11 @@ public static class ControlExtensions
     /// <summary>
     /// Binds the button content to an observable value with converter (creates a centered TextBlock).
     /// </summary>
+    /// <typeparam name="TSource">Source value type.</typeparam>
+    /// <param name="button">Target button.</param>
+    /// <param name="source">Observable source.</param>
+    /// <param name="convert">Conversion function.</param>
+    /// <returns>The button for chaining.</returns>
     public static Button BindContent<TSource>(this Button button, ObservableValue<TSource> source, Func<TSource, string> convert)
     {
         var tb = new TextBlock
@@ -1047,9 +1208,33 @@ public static class ControlExtensions
     /// <summary>
     /// Binds the button content element to an observable value.
     /// </summary>
+    /// <param name="button">Target button.</param>
+    /// <param name="source">Observable source.</param>
+    /// <returns>The button for chaining.</returns>
     public static Button BindContent(this Button button, ObservableValue<Element?> source)
     {
         button.SetBinding(Button.ContentProperty, source, BindingMode.OneWay);
+        return button;
+    }
+
+    /// <summary>
+    /// Binds the button content element to a converted observable value.
+    /// </summary>
+    /// <typeparam name="TSource">Source value type.</typeparam>
+    /// <param name="button">Target button.</param>
+    /// <param name="source">Observable source.</param>
+    /// <param name="convert">Conversion function.</param>
+    /// <returns>The button for chaining.</returns>
+    public static Button BindContent<TSource>(
+        this Button button,
+        ObservableValue<TSource> source,
+        Func<TSource, Element?> convert)
+    {
+        ArgumentNullException.ThrowIfNull(button);
+        ArgumentNullException.ThrowIfNull(source);
+        ArgumentNullException.ThrowIfNull(convert);
+
+        button.SetBinding(Button.ContentProperty, source, convert, mode: BindingMode.OneWay);
         return button;
     }
 
@@ -1104,6 +1289,17 @@ public static class ControlExtensions
         return button;
     }
 
+    /// <summary>
+    /// Sets the predicate that determines whether the button can be clicked.
+    /// </summary>
+    /// <param name="button">Target button.</param>
+    /// <param name="value">Can-click predicate.</param>
+    /// <returns>The button for chaining.</returns>
+    public static Button CanClick(this Button button, Func<bool>? value)
+    {
+        button.CanClick = value;
+        return button;
+    }
 
     #endregion
 
@@ -1112,6 +1308,9 @@ public static class ControlExtensions
     /// <summary>
     /// Sets the text.
     /// </summary>
+    /// <param name="textBox">Target text box.</param>
+    /// <param name="text">Text content.</param>
+    /// <returns>The text box for chaining.</returns>
     public static TextBox Text(this TextBox textBox, string text)
     {
         textBox.Text = text;
@@ -1121,6 +1320,9 @@ public static class ControlExtensions
     /// <summary>
     /// Sets the text.
     /// </summary>
+    /// <param name="textBox">Target multiline text box.</param>
+    /// <param name="text">Text content.</param>
+    /// <returns>The multiline text box for chaining.</returns>
     public static MultiLineTextBox Text(this MultiLineTextBox textBox, string text)
     {
         textBox.Text = text;
@@ -1130,6 +1332,9 @@ public static class ControlExtensions
     /// <summary>
     /// Sets the password.
     /// </summary>
+    /// <param name="passwordBox">Target password box.</param>
+    /// <param name="password">Password value.</param>
+    /// <returns>The password box for chaining.</returns>
     public static PasswordBox Password(this PasswordBox passwordBox, string password)
     {
         passwordBox.Password = password;
@@ -1137,8 +1342,21 @@ public static class ControlExtensions
     }
 
     /// <summary>
+    /// Sets the character used to mask the password.
+    /// </summary>
+    /// <param name="passwordBox">Target password box.</param>
+    /// <param name="value">Password masking character.</param>
+    /// <returns>The password box for chaining.</returns>
+    public static PasswordBox PasswordChar(this PasswordBox passwordBox, char value)
+    {
+        passwordBox.PasswordChar = value;
+        return passwordBox;
+    }
+
+    /// <summary>
     /// Sets the placeholder text.
     /// </summary>
+    /// <typeparam name="T">Text input type.</typeparam>
     /// <param name="textBox">Target text box.</param>
     /// <param name="placeholder">Placeholder text.</param>
     /// <returns>The text box for chaining.</returns>
@@ -1151,6 +1369,7 @@ public static class ControlExtensions
     /// <summary>
     /// Sets the read-only state.
     /// </summary>
+    /// <typeparam name="T">Text input type.</typeparam>
     /// <param name="textBox">Target text box.</param>
     /// <param name="isReadOnly">Read-only state.</param>
     /// <returns>The text box for chaining.</returns>
@@ -1163,6 +1382,7 @@ public static class ControlExtensions
     /// <summary>
     /// Sets whether the text box accepts tab characters.
     /// </summary>
+    /// <typeparam name="T">Text input type.</typeparam>
     /// <param name="textBox">Target text box.</param>
     /// <param name="acceptTab">Accept tab flag.</param>
     /// <returns>The text box for chaining.</returns>
@@ -1173,8 +1393,77 @@ public static class ControlExtensions
     }
 
     /// <summary>
+    /// Sets whether the text input accepts return characters.
+    /// </summary>
+    /// <typeparam name="T">Text input type.</typeparam>
+    /// <param name="textBox">Target text input.</param>
+    /// <param name="value">Whether return characters are accepted.</param>
+    /// <returns>The text input for chaining.</returns>
+    public static T AcceptReturn<T>(this T textBox, bool value = true) where T : TextBase
+    {
+        textBox.AcceptReturn = value;
+        return textBox;
+    }
+
+    /// <summary>
+    /// Sets the caret position.
+    /// </summary>
+    /// <typeparam name="T">Text input type.</typeparam>
+    /// <param name="textBox">Target text input.</param>
+    /// <param name="value">Caret position.</param>
+    /// <returns>The text input for chaining.</returns>
+    public static T CaretPosition<T>(this T textBox, int value) where T : TextBase
+    {
+        textBox.CaretPosition = value;
+        return textBox;
+    }
+
+    /// <summary>
+    /// Sets the input method editor mode.
+    /// </summary>
+    /// <typeparam name="T">Text input type.</typeparam>
+    /// <param name="textBox">Target text input.</param>
+    /// <param name="value">Input method editor mode.</param>
+    /// <returns>The text input for chaining.</returns>
+    public static T ImeMode<T>(
+        this T textBox,
+        global::Aprillz.MewUI.Input.ImeMode value)
+        where T : TextBase
+    {
+        textBox.ImeMode = value;
+        return textBox;
+    }
+
+    /// <summary>
+    /// Sets the maximum text length.
+    /// </summary>
+    /// <typeparam name="T">Text input type.</typeparam>
+    /// <param name="textBox">Target text input.</param>
+    /// <param name="value">Maximum text length.</param>
+    /// <returns>The text input for chaining.</returns>
+    public static T MaxLength<T>(this T textBox, int value) where T : TextBase
+    {
+        textBox.MaxLength = value;
+        return textBox;
+    }
+
+    /// <summary>
+    /// Adds a text wrapping state change handler.
+    /// </summary>
+    /// <typeparam name="T">Text input type.</typeparam>
+    /// <param name="textBox">Target text input.</param>
+    /// <param name="handler">Event handler.</param>
+    /// <returns>The text input for chaining.</returns>
+    public static T OnWrapChanged<T>(this T textBox, Action<bool> handler) where T : TextBase
+    {
+        textBox.WrapChanged += handler;
+        return textBox;
+    }
+
+    /// <summary>
     /// Adds a text changed event handler.
     /// </summary>
+    /// <typeparam name="T">Text input type.</typeparam>
     /// <param name="textBox">Target text box.</param>
     /// <param name="handler">Event handler.</param>
     /// <returns>The text box for chaining.</returns>
@@ -1199,8 +1488,34 @@ public static class ControlExtensions
     }
 
     /// <summary>
+    /// Binds the text to a converted observable value.
+    /// </summary>
+    /// <typeparam name="TSource">Source value type.</typeparam>
+    /// <param name="textBox">Target text box.</param>
+    /// <param name="source">Observable source.</param>
+    /// <param name="convert">Source-to-text converter.</param>
+    /// <param name="convertBack">Optional text-to-source converter.</param>
+    /// <returns>The text box for chaining.</returns>
+    public static TextBox BindText<TSource>(
+        this TextBox textBox,
+        ObservableValue<TSource> source,
+        Func<TSource, string> convert,
+        Func<string, TSource>? convertBack = null)
+    {
+        ArgumentNullException.ThrowIfNull(textBox);
+        ArgumentNullException.ThrowIfNull(source);
+        ArgumentNullException.ThrowIfNull(convert);
+
+        textBox.SetBinding(TextBox.TextProperty, source, convert, convertBack);
+        return textBox;
+    }
+
+    /// <summary>
     /// Binds the text to an observable value.
     /// </summary>
+    /// <param name="textBox">Target multiline text box.</param>
+    /// <param name="source">Observable source.</param>
+    /// <returns>The multiline text box for chaining.</returns>
     public static MultiLineTextBox BindText(this MultiLineTextBox textBox, ObservableValue<string> source)
     {
         ArgumentNullException.ThrowIfNull(textBox);
@@ -1210,13 +1525,62 @@ public static class ControlExtensions
     }
 
     /// <summary>
+    /// Binds the text to a converted observable value.
+    /// </summary>
+    /// <typeparam name="TSource">Source value type.</typeparam>
+    /// <param name="textBox">Target multiline text box.</param>
+    /// <param name="source">Observable source.</param>
+    /// <param name="convert">Source-to-text converter.</param>
+    /// <param name="convertBack">Optional text-to-source converter.</param>
+    /// <returns>The multiline text box for chaining.</returns>
+    public static MultiLineTextBox BindText<TSource>(
+        this MultiLineTextBox textBox,
+        ObservableValue<TSource> source,
+        Func<TSource, string> convert,
+        Func<string, TSource>? convertBack = null)
+    {
+        ArgumentNullException.ThrowIfNull(textBox);
+        ArgumentNullException.ThrowIfNull(source);
+        ArgumentNullException.ThrowIfNull(convert);
+
+        textBox.SetBinding(MultiLineTextBox.TextProperty, source, convert, convertBack);
+        return textBox;
+    }
+
+    /// <summary>
     /// Binds the password to an observable value.
     /// </summary>
+    /// <param name="passwordBox">Target password box.</param>
+    /// <param name="source">Observable source.</param>
+    /// <returns>The password box for chaining.</returns>
     public static PasswordBox BindPassword(this PasswordBox passwordBox, ObservableValue<string> source)
     {
         ArgumentNullException.ThrowIfNull(passwordBox);
         ArgumentNullException.ThrowIfNull(source);
         passwordBox.SetBinding(PasswordBox.PasswordProperty, source);
+        return passwordBox;
+    }
+
+    /// <summary>
+    /// Binds the password to a converted observable value.
+    /// </summary>
+    /// <typeparam name="TSource">Source value type.</typeparam>
+    /// <param name="passwordBox">Target password box.</param>
+    /// <param name="source">Observable source.</param>
+    /// <param name="convert">Source-to-password converter.</param>
+    /// <param name="convertBack">Optional password-to-source converter.</param>
+    /// <returns>The password box for chaining.</returns>
+    public static PasswordBox BindPassword<TSource>(
+        this PasswordBox passwordBox,
+        ObservableValue<TSource> source,
+        Func<TSource, string> convert,
+        Func<string, TSource>? convertBack = null)
+    {
+        ArgumentNullException.ThrowIfNull(passwordBox);
+        ArgumentNullException.ThrowIfNull(source);
+        ArgumentNullException.ThrowIfNull(convert);
+
+        passwordBox.SetBinding(PasswordBox.PasswordProperty, source, convert, convertBack);
         return passwordBox;
     }
 
@@ -1228,6 +1592,11 @@ public static class ControlExtensions
     /// Sets the content to a text label. When <paramref name="accessKey"/> is true (default),
     /// "_" prefixes mark access key characters (e.g., "_Save" registers Alt+S).
     /// </summary>
+    /// <typeparam name="T">Toggle control type.</typeparam>
+    /// <param name="control">Target toggle control.</param>
+    /// <param name="text">Content text.</param>
+    /// <param name="accessKey">Whether underscore prefixes define access keys.</param>
+    /// <returns>The control for chaining.</returns>
     public static T Content<T>(this T control, string text, bool accessKey = true) where T : ToggleBase
     {
         if (accessKey)
@@ -1243,6 +1612,32 @@ public static class ControlExtensions
         return control;
     }
 
+    /// <summary>
+    /// Sets the checked state.
+    /// </summary>
+    /// <typeparam name="T">Toggle control type.</typeparam>
+    /// <param name="control">Target toggle control.</param>
+    /// <param name="value">Checked state.</param>
+    /// <returns>The control for chaining.</returns>
+    public static T IsChecked<T>(this T control, bool value = true) where T : ToggleBase
+    {
+        control.IsChecked = value;
+        return control;
+    }
+
+    /// <summary>
+    /// Adds a checked state change handler.
+    /// </summary>
+    /// <typeparam name="T">Toggle control type.</typeparam>
+    /// <param name="control">Target toggle control.</param>
+    /// <param name="handler">Event handler.</param>
+    /// <returns>The control for chaining.</returns>
+    public static T OnCheckedChanged<T>(this T control, Action<bool> handler) where T : ToggleBase
+    {
+        control.CheckedChanged += handler;
+        return control;
+    }
+
     #endregion
 
     #region CheckBox
@@ -1251,6 +1646,10 @@ public static class ControlExtensions
     /// Sets the content to a text label. When <paramref name="accessKey"/> is true (default),
     /// "_" prefixes mark access key characters (e.g., "_Remember me" registers Alt+R).
     /// </summary>
+    /// <param name="checkBox">Target check box.</param>
+    /// <param name="text">Content text.</param>
+    /// <param name="accessKey">Whether underscore prefixes define access keys.</param>
+    /// <returns>The check box for chaining.</returns>
     public static CheckBox Content(this CheckBox checkBox, string text, bool accessKey = true)
     {
         if (accessKey)
@@ -1325,6 +1724,18 @@ public static class ControlExtensions
     }
 
     /// <summary>
+    /// Adds a nullable checked state change handler.
+    /// </summary>
+    /// <param name="checkBox">Target check box.</param>
+    /// <param name="handler">Event handler.</param>
+    /// <returns>The check box for chaining.</returns>
+    public static CheckBox OnCheckedChanged(this CheckBox checkBox, Action<bool?> handler)
+    {
+        checkBox.CheckedChanged += handler;
+        return checkBox;
+    }
+
+    /// <summary>
     /// Enables three-state mode.
     /// </summary>
     /// <param name="checkBox">Target check box.</param>
@@ -1362,6 +1773,29 @@ public static class ControlExtensions
         ArgumentNullException.ThrowIfNull(source);
 
         checkBox.SetBinding(CheckBox.IsCheckedProperty, source);
+        return checkBox;
+    }
+
+    /// <summary>
+    /// Binds the checked state to a converted observable value.
+    /// </summary>
+    /// <typeparam name="TSource">Source value type.</typeparam>
+    /// <param name="checkBox">Target check box.</param>
+    /// <param name="source">Observable source.</param>
+    /// <param name="convert">Source-to-checked-state converter.</param>
+    /// <param name="convertBack">Optional checked-state-to-source converter.</param>
+    /// <returns>The check box for chaining.</returns>
+    public static CheckBox BindIsChecked<TSource>(
+        this CheckBox checkBox,
+        ObservableValue<TSource> source,
+        Func<TSource, bool?> convert,
+        Func<bool?, TSource>? convertBack = null)
+    {
+        ArgumentNullException.ThrowIfNull(checkBox);
+        ArgumentNullException.ThrowIfNull(source);
+        ArgumentNullException.ThrowIfNull(convert);
+
+        checkBox.SetBinding(CheckBox.IsCheckedProperty, source, convert, convertBack);
         return checkBox;
     }
 
@@ -1520,6 +1954,10 @@ public static class ControlExtensions
     /// Sets the content to a centered text label. When <paramref name="accessKey"/> is true (default),
     /// "_" prefixes mark access key characters.
     /// </summary>
+    /// <param name="toggleButton">Target toggle button.</param>
+    /// <param name="text">Content text.</param>
+    /// <param name="accessKey">Whether underscore prefixes define access keys.</param>
+    /// <returns>The toggle button for chaining.</returns>
     public static ToggleButton Content(this ToggleButton toggleButton, string text, bool accessKey = true)
     {
         if (accessKey)
@@ -1587,6 +2025,29 @@ public static class ControlExtensions
         return toggleButton;
     }
 
+    /// <summary>
+    /// Binds the checked state to a converted observable value.
+    /// </summary>
+    /// <typeparam name="TSource">Source value type.</typeparam>
+    /// <param name="toggleButton">Target toggle button.</param>
+    /// <param name="source">Observable source.</param>
+    /// <param name="convert">Source-to-checked-state converter.</param>
+    /// <param name="convertBack">Optional checked-state-to-source converter.</param>
+    /// <returns>The toggle button for chaining.</returns>
+    public static ToggleButton BindIsChecked<TSource>(
+        this ToggleButton toggleButton,
+        ObservableValue<TSource> source,
+        Func<TSource, bool> convert,
+        Func<bool, TSource>? convertBack = null)
+    {
+        ArgumentNullException.ThrowIfNull(toggleButton);
+        ArgumentNullException.ThrowIfNull(source);
+        ArgumentNullException.ThrowIfNull(convert);
+
+        toggleButton.SetBinding(ToggleBase.IsCheckedProperty, source, convert, convertBack);
+        return toggleButton;
+    }
+
     #endregion
 
     #region ToggleSwitch
@@ -1627,6 +2088,41 @@ public static class ControlExtensions
         ArgumentNullException.ThrowIfNull(source);
 
         toggleSwitch.SetBinding(ToggleBase.IsCheckedProperty, source);
+        return toggleSwitch;
+    }
+
+    /// <summary>
+    /// Binds the checked state to a converted observable value.
+    /// </summary>
+    /// <typeparam name="TSource">Source value type.</typeparam>
+    /// <param name="toggleSwitch">Target toggle switch.</param>
+    /// <param name="source">Observable source.</param>
+    /// <param name="convert">Source-to-checked-state converter.</param>
+    /// <param name="convertBack">Optional checked-state-to-source converter.</param>
+    /// <returns>The toggle switch for chaining.</returns>
+    public static ToggleSwitch BindIsChecked<TSource>(
+        this ToggleSwitch toggleSwitch,
+        ObservableValue<TSource> source,
+        Func<TSource, bool> convert,
+        Func<bool, TSource>? convertBack = null)
+    {
+        ArgumentNullException.ThrowIfNull(toggleSwitch);
+        ArgumentNullException.ThrowIfNull(source);
+        ArgumentNullException.ThrowIfNull(convert);
+
+        toggleSwitch.SetBinding(ToggleBase.IsCheckedProperty, source, convert, convertBack);
+        return toggleSwitch;
+    }
+
+    /// <summary>
+    /// Sets the thumb brush.
+    /// </summary>
+    /// <param name="toggleSwitch">Target toggle switch.</param>
+    /// <param name="value">Thumb brush color.</param>
+    /// <returns>The toggle switch for chaining.</returns>
+    public static ToggleSwitch ThumbBrush(this ToggleSwitch toggleSwitch, Color value)
+    {
+        toggleSwitch.ThumbBrush = value;
         return toggleSwitch;
     }
 
@@ -1760,6 +2256,8 @@ public static class ControlExtensions
     /// <summary>
     /// Uses fixed-height row virtualization with theme default item height.
     /// </summary>
+    /// <param name="listBox">Target list box.</param>
+    /// <returns>The list box for chaining.</returns>
     public static ListBox FixedHeightPresenter(this ListBox listBox)
     {
         listBox.SetPresenter(new FixedHeightItemsPresenter());
@@ -1769,6 +2267,9 @@ public static class ControlExtensions
     /// <summary>
     /// Uses fixed-height row virtualization with explicit item height.
     /// </summary>
+    /// <param name="listBox">Target list box.</param>
+    /// <param name="itemHeight">Fixed item height.</param>
+    /// <returns>The list box for chaining.</returns>
     public static ListBox FixedHeightPresenter(this ListBox listBox, double itemHeight)
     {
         listBox.SetPresenter(new FixedHeightItemsPresenter { ItemHeight = itemHeight });
@@ -1778,6 +2279,8 @@ public static class ControlExtensions
     /// <summary>
     /// Uses variable-height virtualization (items are measured individually).
     /// </summary>
+    /// <param name="listBox">Target list box.</param>
+    /// <returns>The list box for chaining.</returns>
     public static ListBox VariableHeightPresenter(this ListBox listBox)
     {
         listBox.SetPresenter(new VariableHeightItemsPresenter());
@@ -1787,6 +2290,8 @@ public static class ControlExtensions
     /// <summary>
     /// Uses non-virtualizing stack layout (all items realized).
     /// </summary>
+    /// <param name="listBox">Target list box.</param>
+    /// <returns>The list box for chaining.</returns>
     public static ListBox StackPresenter(this ListBox listBox)
     {
         listBox.SetPresenter(new StackItemsPresenter());
@@ -1796,6 +2301,10 @@ public static class ControlExtensions
     /// <summary>
     /// Uses wrap-grid virtualization with fixed item size.
     /// </summary>
+    /// <param name="listBox">Target list box.</param>
+    /// <param name="itemWidth">Fixed item width.</param>
+    /// <param name="itemHeight">Fixed item height.</param>
+    /// <returns>The list box for chaining.</returns>
     public static ListBox WrapPresenter(this ListBox listBox, double itemWidth, double itemHeight)
     {
         listBox.SetPresenter(new WrapItemsPresenter { ItemWidth = itemWidth, ItemHeight = itemHeight });
@@ -1838,6 +2347,41 @@ public static class ControlExtensions
         ArgumentNullException.ThrowIfNull(source);
 
         listBox.SetBinding(ListBox.SelectedIndexProperty, source);
+        return listBox;
+    }
+
+    /// <summary>
+    /// Binds the selected index to a converted observable value.
+    /// </summary>
+    /// <typeparam name="TSource">Source value type.</typeparam>
+    /// <param name="listBox">Target list box.</param>
+    /// <param name="source">Observable source.</param>
+    /// <param name="convert">Source-to-index converter.</param>
+    /// <param name="convertBack">Optional index-to-source converter.</param>
+    /// <returns>The list box for chaining.</returns>
+    public static ListBox BindSelectedIndex<TSource>(
+        this ListBox listBox,
+        ObservableValue<TSource> source,
+        Func<TSource, int> convert,
+        Func<int, TSource>? convertBack = null)
+    {
+        ArgumentNullException.ThrowIfNull(listBox);
+        ArgumentNullException.ThrowIfNull(source);
+        ArgumentNullException.ThrowIfNull(convert);
+
+        listBox.SetBinding(ListBox.SelectedIndexProperty, source, convert, convertBack);
+        return listBox;
+    }
+
+    /// <summary>
+    /// Adds an item activation handler.
+    /// </summary>
+    /// <param name="listBox">Target list box.</param>
+    /// <param name="handler">Event handler.</param>
+    /// <returns>The list box for chaining.</returns>
+    public static ListBox OnItemActivated(this ListBox listBox, Action<int> handler)
+    {
+        listBox.ItemActivated += handler;
         return listBox;
     }
 
@@ -1937,13 +2481,10 @@ public static class ControlExtensions
     }
 
     /// <summary>
-    /// Sets the items presenter mode.
-    /// </summary>
-    /// <param name="itemsControl">Target items control.</param>
-
-    /// <summary>
     /// Uses fixed-height row virtualization with theme default item height.
     /// </summary>
+    /// <param name="itemsControl">Target items control.</param>
+    /// <returns>The items control for chaining.</returns>
     public static ItemsControl FixedHeightPresenter(this ItemsControl itemsControl)
     {
         itemsControl.SetPresenter(new FixedHeightItemsPresenter());
@@ -1953,6 +2494,9 @@ public static class ControlExtensions
     /// <summary>
     /// Uses fixed-height row virtualization with explicit item height.
     /// </summary>
+    /// <param name="itemsControl">Target items control.</param>
+    /// <param name="itemHeight">Fixed item height.</param>
+    /// <returns>The items control for chaining.</returns>
     public static ItemsControl FixedHeightPresenter(this ItemsControl itemsControl, double itemHeight)
     {
         itemsControl.SetPresenter(new FixedHeightItemsPresenter { ItemHeight = itemHeight });
@@ -1962,6 +2506,8 @@ public static class ControlExtensions
     /// <summary>
     /// Uses variable-height virtualization (items are measured individually).
     /// </summary>
+    /// <param name="itemsControl">Target items control.</param>
+    /// <returns>The items control for chaining.</returns>
     public static ItemsControl VariableHeightPresenter(this ItemsControl itemsControl)
     {
         itemsControl.SetPresenter(new VariableHeightItemsPresenter());
@@ -1971,6 +2517,8 @@ public static class ControlExtensions
     /// <summary>
     /// Uses non-virtualizing stack layout (all items realized).
     /// </summary>
+    /// <param name="itemsControl">Target items control.</param>
+    /// <returns>The items control for chaining.</returns>
     public static ItemsControl StackPresenter(this ItemsControl itemsControl)
     {
         itemsControl.SetPresenter(new StackItemsPresenter());
@@ -1980,6 +2528,10 @@ public static class ControlExtensions
     /// <summary>
     /// Uses wrap-grid virtualization with fixed item size.
     /// </summary>
+    /// <param name="itemsControl">Target items control.</param>
+    /// <param name="itemWidth">Fixed item width.</param>
+    /// <param name="itemHeight">Fixed item height.</param>
+    /// <returns>The items control for chaining.</returns>
     public static ItemsControl WrapPresenter(this ItemsControl itemsControl, double itemWidth, double itemHeight)
     {
         itemsControl.SetPresenter(new WrapItemsPresenter { ItemWidth = itemWidth, ItemHeight = itemHeight });
@@ -1994,6 +2546,8 @@ public static class ControlExtensions
     /// Uses fixed-height row virtualization (default). Rows assume <see cref="GridView.RowHeight"/>
     /// or the theme default; cell content taller than that clips.
     /// </summary>
+    /// <param name="grid">Target grid view.</param>
+    /// <returns>The grid view for chaining.</returns>
     public static GridView FixedHeightPresenter(this GridView grid)
     {
         ArgumentNullException.ThrowIfNull(grid);
@@ -2011,6 +2565,8 @@ public static class ControlExtensions
     /// cell height plus <see cref="GridView.CellPadding"/> vertical thickness - suitable for
     /// rows with wrapping text or differently sized cell content.
     /// </summary>
+    /// <param name="grid">Target grid view.</param>
+    /// <returns>The grid view for chaining.</returns>
     public static GridView VariableHeightPresenter(this GridView grid)
     {
         ArgumentNullException.ThrowIfNull(grid);
@@ -2100,6 +2656,18 @@ public static class ControlExtensions
     {
         ArgumentNullException.ThrowIfNull(treeView);
         treeView.SelectedNode = selectedNode;
+        return treeView;
+    }
+
+    /// <summary>
+    /// Sets the selected item.
+    /// </summary>
+    /// <param name="treeView">Target tree view.</param>
+    /// <param name="value">Selected item.</param>
+    /// <returns>The tree view for chaining.</returns>
+    public static TreeView SelectedItem(this TreeView treeView, object? value)
+    {
+        treeView.SelectedItem = value;
         return treeView;
     }
 
@@ -2587,6 +3155,29 @@ public static class ControlExtensions
     }
 
     /// <summary>
+    /// Binds the selected index to a converted observable value.
+    /// </summary>
+    /// <typeparam name="TSource">Source value type.</typeparam>
+    /// <param name="comboBox">Target combo box.</param>
+    /// <param name="source">Observable source.</param>
+    /// <param name="convert">Source-to-index converter.</param>
+    /// <param name="convertBack">Optional index-to-source converter.</param>
+    /// <returns>The combo box for chaining.</returns>
+    public static ComboBox BindSelectedIndex<TSource>(
+        this ComboBox comboBox,
+        ObservableValue<TSource> source,
+        Func<TSource, int> convert,
+        Func<int, TSource>? convertBack = null)
+    {
+        ArgumentNullException.ThrowIfNull(comboBox);
+        ArgumentNullException.ThrowIfNull(source);
+        ArgumentNullException.ThrowIfNull(convert);
+
+        comboBox.SetBinding(ComboBox.SelectedIndexProperty, source, convert, convertBack);
+        return comboBox;
+    }
+
+    /// <summary>
     /// Sets whether mouse wheel input changes the selected item.
     /// </summary>
     /// <param name="comboBox">Target combo box.</param>
@@ -2598,10 +3189,28 @@ public static class ControlExtensions
         return comboBox;
     }
 
+    /// <summary>
+    /// Sets whether alternating row background colors are used.
+    /// </summary>
+    /// <param name="comboBox">Target combo box.</param>
+    /// <param name="value">Whether zebra striping is enabled.</param>
+    /// <returns>The combo box for chaining.</returns>
     public static ComboBox ZebraStriping(this ComboBox comboBox, bool value = true)
     {
         ArgumentNullException.ThrowIfNull(comboBox);
         comboBox.ZebraStriping = value;
+        return comboBox;
+    }
+
+    /// <summary>
+    /// Sets the dropdown item height.
+    /// </summary>
+    /// <param name="comboBox">Target combo box.</param>
+    /// <param name="value">Item height.</param>
+    /// <returns>The combo box for chaining.</returns>
+    public static ComboBox ItemHeight(this ComboBox comboBox, double value)
+    {
+        comboBox.ItemHeight = value;
         return comboBox;
     }
 
@@ -2816,6 +3425,45 @@ public static class ControlExtensions
         return rangeBase;
     }
 
+    /// <summary>
+    /// Sets the small change increment.
+    /// </summary>
+    /// <typeparam name="T">Range control type.</typeparam>
+    /// <param name="range">Target range control.</param>
+    /// <param name="value">Small change increment.</param>
+    /// <returns>The control for chaining.</returns>
+    public static T SmallChange<T>(this T range, double value) where T : RangeBase
+    {
+        range.SmallChange = value;
+        return range;
+    }
+
+    /// <summary>
+    /// Sets the large change increment.
+    /// </summary>
+    /// <typeparam name="T">Range control type.</typeparam>
+    /// <param name="range">Target range control.</param>
+    /// <param name="value">Large change increment.</param>
+    /// <returns>The control for chaining.</returns>
+    public static T LargeChange<T>(this T range, double value) where T : RangeBase
+    {
+        range.LargeChange = value;
+        return range;
+    }
+
+    /// <summary>
+    /// Adds a value change handler.
+    /// </summary>
+    /// <typeparam name="T">Range control type.</typeparam>
+    /// <param name="range">Target range control.</param>
+    /// <param name="handler">Event handler.</param>
+    /// <returns>The control for chaining.</returns>
+    public static T OnValueChanged<T>(this T range, Action<double> handler) where T : RangeBase
+    {
+        range.ValueChanged += handler;
+        return range;
+    }
+
     #endregion
 
     #region ProgressBar
@@ -2832,6 +3480,27 @@ public static class ControlExtensions
         ArgumentNullException.ThrowIfNull(source);
 
         progressBar.SetBinding(RangeBase.ValueProperty, source, BindingMode.OneWay);
+        return progressBar;
+    }
+
+    /// <summary>
+    /// Binds the value to a converted observable value.
+    /// </summary>
+    /// <typeparam name="TSource">Source value type.</typeparam>
+    /// <param name="progressBar">Target progress bar.</param>
+    /// <param name="source">Observable source.</param>
+    /// <param name="convert">Source-to-value converter.</param>
+    /// <returns>The progress bar for chaining.</returns>
+    public static ProgressBar BindValue<TSource>(
+        this ProgressBar progressBar,
+        ObservableValue<TSource> source,
+        Func<TSource, double> convert)
+    {
+        ArgumentNullException.ThrowIfNull(progressBar);
+        ArgumentNullException.ThrowIfNull(source);
+        ArgumentNullException.ThrowIfNull(convert);
+
+        progressBar.SetBinding(RangeBase.ValueProperty, source, convert, mode: BindingMode.OneWay);
         return progressBar;
     }
 
@@ -2879,6 +3548,29 @@ public static class ControlExtensions
     }
 
     /// <summary>
+    /// Binds the value to a converted observable value.
+    /// </summary>
+    /// <typeparam name="TSource">Source value type.</typeparam>
+    /// <param name="slider">Target slider.</param>
+    /// <param name="source">Observable source.</param>
+    /// <param name="convert">Source-to-value converter.</param>
+    /// <param name="convertBack">Optional value-to-source converter.</param>
+    /// <returns>The slider for chaining.</returns>
+    public static Slider BindValue<TSource>(
+        this Slider slider,
+        ObservableValue<TSource> source,
+        Func<TSource, double> convert,
+        Func<double, TSource>? convertBack = null)
+    {
+        ArgumentNullException.ThrowIfNull(slider);
+        ArgumentNullException.ThrowIfNull(source);
+        ArgumentNullException.ThrowIfNull(convert);
+
+        slider.SetBinding(RangeBase.ValueProperty, source, convert, convertBack);
+        return slider;
+    }
+
+    /// <summary>
     /// Sets whether mouse wheel input changes the value.
     /// </summary>
     /// <param name="slider">Target slider.</param>
@@ -2887,6 +3579,30 @@ public static class ControlExtensions
     public static Slider ChangeOnWheel(this Slider slider, bool value = true)
     {
         slider.ChangeOnWheel = value;
+        return slider;
+    }
+
+    /// <summary>
+    /// Sets the slider thumb brush.
+    /// </summary>
+    /// <param name="slider">Target slider.</param>
+    /// <param name="value">Thumb brush color.</param>
+    /// <returns>The slider for chaining.</returns>
+    public static Slider ThumbBrush(this Slider slider, Color value)
+    {
+        slider.ThumbBrush = value;
+        return slider;
+    }
+
+    /// <summary>
+    /// Sets the slider thumb border brush.
+    /// </summary>
+    /// <param name="slider">Target slider.</param>
+    /// <param name="value">Thumb border brush color.</param>
+    /// <returns>The slider for chaining.</returns>
+    public static Slider ThumbBorderBrush(this Slider slider, Color value)
+    {
+        slider.ThumbBorderBrush = value;
         return slider;
     }
 
@@ -2922,6 +3638,9 @@ public static class ControlExtensions
     /// Sets <see cref="NumericUpDown.IsInteger"/>: when true, values are rounded
     /// to whole numbers and the effective Step is at least 1.
     /// </summary>
+    /// <param name="numericUpDown">Target numeric up-down.</param>
+    /// <param name="value">Whether integer mode is enabled.</param>
+    /// <returns>The numeric up-down for chaining.</returns>
     public static NumericUpDown IsInteger(this NumericUpDown numericUpDown, bool value = true)
     {
         numericUpDown.IsInteger = value;
@@ -2971,6 +3690,29 @@ public static class ControlExtensions
     }
 
     /// <summary>
+    /// Binds the value to a converted observable value.
+    /// </summary>
+    /// <typeparam name="TSource">Source value type.</typeparam>
+    /// <param name="numericUpDown">Target numeric up-down.</param>
+    /// <param name="source">Observable source.</param>
+    /// <param name="convert">Source-to-value converter.</param>
+    /// <param name="convertBack">Optional value-to-source converter.</param>
+    /// <returns>The numeric up-down for chaining.</returns>
+    public static NumericUpDown BindValue<TSource>(
+        this NumericUpDown numericUpDown,
+        ObservableValue<TSource> source,
+        Func<TSource, double> convert,
+        Func<double, TSource>? convertBack = null)
+    {
+        ArgumentNullException.ThrowIfNull(numericUpDown);
+        ArgumentNullException.ThrowIfNull(source);
+        ArgumentNullException.ThrowIfNull(convert);
+
+        numericUpDown.SetBinding(RangeBase.ValueProperty, source, convert, convertBack);
+        return numericUpDown;
+    }
+
+    /// <summary>
     /// Sets whether mouse wheel input changes the value.
     /// </summary>
     /// <param name="numericUpDown">Target numeric up-down.</param>
@@ -2989,6 +3731,7 @@ public static class ControlExtensions
     /// <summary>
     /// Sets the window title.
     /// </summary>
+    /// <typeparam name="TWindow">Window type.</typeparam>
     /// <param name="window">Target window.</param>
     /// <param name="title">Window title.</param>
     /// <returns>The window for chaining.</returns>
@@ -2998,6 +3741,13 @@ public static class ControlExtensions
         return window;
     }
 
+    /// <summary>
+    /// Sets the window icon.
+    /// </summary>
+    /// <typeparam name="TWindow">Window type.</typeparam>
+    /// <param name="window">Target window.</param>
+    /// <param name="icon">Window icon.</param>
+    /// <returns>The window for chaining.</returns>
     public static TWindow Icon<TWindow>(this TWindow window, IconSource? icon) where TWindow : Window
     {
         ArgumentNullException.ThrowIfNull(window);
@@ -3008,6 +3758,7 @@ public static class ControlExtensions
     /// <summary>
     /// Sets the build callback.
     /// </summary>
+    /// <typeparam name="TWindow">Window type.</typeparam>
     /// <param name="window">Target window.</param>
     /// <param name="build">Build callback.</param>
     /// <returns>The window for chaining.</returns>
@@ -3026,6 +3777,7 @@ public static class ControlExtensions
     /// <summary>
     /// Adds a loaded event handler.
     /// </summary>
+    /// <typeparam name="TWindow">Window type.</typeparam>
     /// <param name="window">Target window.</param>
     /// <param name="handler">Event handler.</param>
     /// <returns>The window for chaining.</returns>
@@ -3038,6 +3790,7 @@ public static class ControlExtensions
     /// <summary>
     /// Adds a closing event handler.
     /// </summary>
+    /// <typeparam name="TWindow">Window type.</typeparam>
     /// <param name="window">Target window.</param>
     /// <param name="handler">Event handler.</param>
     /// <returns>The window for chaining.</returns>
@@ -3051,6 +3804,7 @@ public static class ControlExtensions
     /// <summary>
     /// Adds a closed event handler.
     /// </summary>
+    /// <typeparam name="TWindow">Window type.</typeparam>
     /// <param name="window">Target window.</param>
     /// <param name="handler">Event handler.</param>
     /// <returns>The window for chaining.</returns>
@@ -3063,6 +3817,7 @@ public static class ControlExtensions
     /// <summary>
     /// Adds an activated event handler.
     /// </summary>
+    /// <typeparam name="TWindow">Window type.</typeparam>
     /// <param name="window">Target window.</param>
     /// <param name="handler">Event handler.</param>
     /// <returns>The window for chaining.</returns>
@@ -3075,6 +3830,7 @@ public static class ControlExtensions
     /// <summary>
     /// Adds a deactivated event handler.
     /// </summary>
+    /// <typeparam name="TWindow">Window type.</typeparam>
     /// <param name="window">Target window.</param>
     /// <param name="handler">Event handler.</param>
     /// <returns>The window for chaining.</returns>
@@ -3087,6 +3843,7 @@ public static class ControlExtensions
     /// <summary>
     /// Adds a size changed event handler.
     /// </summary>
+    /// <typeparam name="TWindow">Window type.</typeparam>
     /// <param name="window">Target window.</param>
     /// <param name="handler">Event handler.</param>
     /// <returns>The window for chaining.</returns>
@@ -3099,6 +3856,7 @@ public static class ControlExtensions
     /// <summary>
     /// Adds a DPI changed event handler.
     /// </summary>
+    /// <typeparam name="TWindow">Window type.</typeparam>
     /// <param name="window">Target window.</param>
     /// <param name="handler">Event handler.</param>
     /// <returns>The window for chaining.</returns>
@@ -3111,6 +3869,7 @@ public static class ControlExtensions
     /// <summary>
     /// Adds a theme changed event handler.
     /// </summary>
+    /// <typeparam name="TWindow">Window type.</typeparam>
     /// <param name="window">Target window.</param>
     /// <param name="handler">Event handler.</param>
     /// <returns>The window for chaining.</returns>
@@ -3123,6 +3882,7 @@ public static class ControlExtensions
     /// <summary>
     /// Adds a first frame rendered event handler.
     /// </summary>
+    /// <typeparam name="TWindow">Window type.</typeparam>
     /// <param name="window">Target window.</param>
     /// <param name="handler">Event handler.</param>
     /// <returns>The window for chaining.</returns>
@@ -3135,6 +3895,7 @@ public static class ControlExtensions
     /// <summary>
     /// Adds a frame rendered event handler.
     /// </summary>
+    /// <typeparam name="TWindow">Window type.</typeparam>
     /// <param name="window">Target window.</param>
     /// <param name="handler">Event handler.</param>
     /// <returns>The window for chaining.</returns>
@@ -3147,6 +3908,7 @@ public static class ControlExtensions
     /// <summary>
     /// Adds a preview key down event handler.
     /// </summary>
+    /// <typeparam name="TWindow">Window type.</typeparam>
     /// <param name="window">Target window.</param>
     /// <param name="handler">Event handler.</param>
     /// <returns>The window for chaining.</returns>
@@ -3159,6 +3921,7 @@ public static class ControlExtensions
     /// <summary>
     /// Adds a preview key up event handler.
     /// </summary>
+    /// <typeparam name="TWindow">Window type.</typeparam>
     /// <param name="window">Target window.</param>
     /// <param name="handler">Event handler.</param>
     /// <returns>The window for chaining.</returns>
@@ -3171,6 +3934,7 @@ public static class ControlExtensions
     /// <summary>
     /// Adds a preview text input event handler.
     /// </summary>
+    /// <typeparam name="TWindow">Window type.</typeparam>
     /// <param name="window">Target window.</param>
     /// <param name="handler">Event handler.</param>
     /// <returns>The window for chaining.</returns>
@@ -3180,18 +3944,39 @@ public static class ControlExtensions
         return window;
     }
 
+    /// <summary>
+    /// Adds a preview text composition start handler.
+    /// </summary>
+    /// <typeparam name="TWindow">Window type.</typeparam>
+    /// <param name="window">Target window.</param>
+    /// <param name="handler">Event handler.</param>
+    /// <returns>The window for chaining.</returns>
     public static TWindow OnPreviewTextCompositionStart<TWindow>(this TWindow window, Action<TextCompositionEventArgs> handler) where TWindow : Window
     {
         window.PreviewTextCompositionStart += handler;
         return window;
     }
 
+    /// <summary>
+    /// Adds a preview text composition update handler.
+    /// </summary>
+    /// <typeparam name="TWindow">Window type.</typeparam>
+    /// <param name="window">Target window.</param>
+    /// <param name="handler">Event handler.</param>
+    /// <returns>The window for chaining.</returns>
     public static TWindow OnPreviewTextCompositionUpdate<TWindow>(this TWindow window, Action<TextCompositionEventArgs> handler) where TWindow : Window
     {
         window.PreviewTextCompositionUpdate += handler;
         return window;
     }
 
+    /// <summary>
+    /// Adds a preview text composition end handler.
+    /// </summary>
+    /// <typeparam name="TWindow">Window type.</typeparam>
+    /// <param name="window">Target window.</param>
+    /// <param name="handler">Event handler.</param>
+    /// <returns>The window for chaining.</returns>
     public static TWindow OnPreviewTextCompositionEnd<TWindow>(this TWindow window, Action<TextCompositionEventArgs> handler) where TWindow : Window
     {
         window.PreviewTextCompositionEnd += handler;
@@ -3282,6 +4067,18 @@ public static class ControlExtensions
         return scrollViewer;
     }
 
+    /// <summary>
+    /// Adds a scroll state change handler.
+    /// </summary>
+    /// <param name="scrollViewer">Target scroll viewer.</param>
+    /// <param name="handler">Event handler.</param>
+    /// <returns>The scroll viewer for chaining.</returns>
+    public static ScrollViewer OnScrollChanged(this ScrollViewer scrollViewer, Action handler)
+    {
+        scrollViewer.ScrollChanged += handler;
+        return scrollViewer;
+    }
+
     #endregion
 
     #region ContentControl
@@ -3306,6 +4103,9 @@ public static class ControlExtensions
     /// <summary>
     /// Sets the selected date.
     /// </summary>
+    /// <param name="calendar">Target calendar.</param>
+    /// <param name="date">Selected date.</param>
+    /// <returns>The calendar for chaining.</returns>
     public static Calendar SelectedDate(this Calendar calendar, DateTime? date)
     {
         calendar.SelectedDate = date;
@@ -3315,6 +4115,9 @@ public static class ControlExtensions
     /// <summary>
     /// Sets the display date (visible month/year).
     /// </summary>
+    /// <param name="calendar">Target calendar.</param>
+    /// <param name="date">Display date.</param>
+    /// <returns>The calendar for chaining.</returns>
     public static Calendar DisplayDate(this Calendar calendar, DateTime date)
     {
         calendar.DisplayDate = date;
@@ -3324,6 +4127,9 @@ public static class ControlExtensions
     /// <summary>
     /// Sets the display mode.
     /// </summary>
+    /// <param name="calendar">Target calendar.</param>
+    /// <param name="mode">Display mode.</param>
+    /// <returns>The calendar for chaining.</returns>
     public static Calendar DisplayMode(this Calendar calendar, CalendarMode mode)
     {
         calendar.DisplayMode = mode;
@@ -3333,6 +4139,9 @@ public static class ControlExtensions
     /// <summary>
     /// Sets the first day of the week.
     /// </summary>
+    /// <param name="calendar">Target calendar.</param>
+    /// <param name="day">First day of the week.</param>
+    /// <returns>The calendar for chaining.</returns>
     public static Calendar FirstDayOfWeek(this Calendar calendar, DayOfWeek day)
     {
         calendar.FirstDayOfWeek = day;
@@ -3342,6 +4151,9 @@ public static class ControlExtensions
     /// <summary>
     /// Sets whether today is highlighted.
     /// </summary>
+    /// <param name="calendar">Target calendar.</param>
+    /// <param name="value">Whether today is highlighted.</param>
+    /// <returns>The calendar for chaining.</returns>
     public static Calendar IsTodayHighlighted(this Calendar calendar, bool value)
     {
         calendar.IsTodayHighlighted = value;
@@ -3351,6 +4163,9 @@ public static class ControlExtensions
     /// <summary>
     /// Adds a selected date changed event handler.
     /// </summary>
+    /// <param name="calendar">Target calendar.</param>
+    /// <param name="handler">Event handler.</param>
+    /// <returns>The calendar for chaining.</returns>
     public static Calendar OnSelectedDateChanged(this Calendar calendar, Action<DateTime?> handler)
     {
         calendar.SelectedDateChanged += handler;
@@ -3360,12 +4175,62 @@ public static class ControlExtensions
     /// <summary>
     /// Binds the selected date to an observable value.
     /// </summary>
+    /// <param name="calendar">Target calendar.</param>
+    /// <param name="source">Observable source.</param>
+    /// <returns>The calendar for chaining.</returns>
     public static Calendar BindSelectedDate(this Calendar calendar, ObservableValue<DateTime?> source)
     {
         ArgumentNullException.ThrowIfNull(calendar);
         ArgumentNullException.ThrowIfNull(source);
 
         calendar.SetBinding(Calendar.SelectedDateProperty, source);
+        return calendar;
+    }
+
+    /// <summary>
+    /// Binds the selected date to a converted observable value.
+    /// </summary>
+    /// <typeparam name="TSource">Source value type.</typeparam>
+    /// <param name="calendar">Target calendar.</param>
+    /// <param name="source">Observable source.</param>
+    /// <param name="convert">Source-to-date converter.</param>
+    /// <param name="convertBack">Optional date-to-source converter.</param>
+    /// <returns>The calendar for chaining.</returns>
+    public static Calendar BindSelectedDate<TSource>(
+        this Calendar calendar,
+        ObservableValue<TSource> source,
+        Func<TSource, DateTime?> convert,
+        Func<DateTime?, TSource>? convertBack = null)
+    {
+        ArgumentNullException.ThrowIfNull(calendar);
+        ArgumentNullException.ThrowIfNull(source);
+        ArgumentNullException.ThrowIfNull(convert);
+
+        calendar.SetBinding(Calendar.SelectedDateProperty, source, convert, convertBack);
+        return calendar;
+    }
+
+    /// <summary>
+    /// Adds a date activation handler.
+    /// </summary>
+    /// <param name="calendar">Target calendar.</param>
+    /// <param name="handler">Event handler.</param>
+    /// <returns>The calendar for chaining.</returns>
+    public static Calendar OnDateActivated(this Calendar calendar, Action<DateTime> handler)
+    {
+        calendar.DateActivated += handler;
+        return calendar;
+    }
+
+    /// <summary>
+    /// Adds a display mode change handler.
+    /// </summary>
+    /// <param name="calendar">Target calendar.</param>
+    /// <param name="handler">Event handler.</param>
+    /// <returns>The calendar for chaining.</returns>
+    public static Calendar OnDisplayModeChanged(this Calendar calendar, Action<CalendarMode> handler)
+    {
+        calendar.DisplayModeChanged += handler;
         return calendar;
     }
 
@@ -3376,6 +4241,9 @@ public static class ControlExtensions
     /// <summary>
     /// Sets the selected date.
     /// </summary>
+    /// <param name="datePicker">Target date picker.</param>
+    /// <param name="date">Selected date.</param>
+    /// <returns>The date picker for chaining.</returns>
     public static DatePicker SelectedDate(this DatePicker datePicker, DateTime? date)
     {
         datePicker.SelectedDate = date;
@@ -3385,6 +4253,9 @@ public static class ControlExtensions
     /// <summary>
     /// Sets the placeholder text.
     /// </summary>
+    /// <param name="datePicker">Target date picker.</param>
+    /// <param name="placeholder">Placeholder text.</param>
+    /// <returns>The date picker for chaining.</returns>
     public static DatePicker Placeholder(this DatePicker datePicker, string placeholder)
     {
         datePicker.Placeholder = placeholder;
@@ -3394,6 +4265,9 @@ public static class ControlExtensions
     /// <summary>
     /// Sets the date format string.
     /// </summary>
+    /// <param name="datePicker">Target date picker.</param>
+    /// <param name="format">Date format string.</param>
+    /// <returns>The date picker for chaining.</returns>
     public static DatePicker DateFormat(this DatePicker datePicker, string format)
     {
         datePicker.DateFormat = format;
@@ -3403,6 +4277,9 @@ public static class ControlExtensions
     /// <summary>
     /// Sets the first day of the week.
     /// </summary>
+    /// <param name="datePicker">Target date picker.</param>
+    /// <param name="day">First day of the week.</param>
+    /// <returns>The date picker for chaining.</returns>
     public static DatePicker FirstDayOfWeek(this DatePicker datePicker, DayOfWeek day)
     {
         datePicker.FirstDayOfWeek = day;
@@ -3412,6 +4289,9 @@ public static class ControlExtensions
     /// <summary>
     /// Adds a selected date changed event handler.
     /// </summary>
+    /// <param name="datePicker">Target date picker.</param>
+    /// <param name="handler">Event handler.</param>
+    /// <returns>The date picker for chaining.</returns>
     public static DatePicker OnSelectedDateChanged(this DatePicker datePicker, Action<DateTime?> handler)
     {
         datePicker.SelectedDateChanged += handler;
@@ -3421,6 +4301,9 @@ public static class ControlExtensions
     /// <summary>
     /// Binds the selected date to an observable value.
     /// </summary>
+    /// <param name="datePicker">Target date picker.</param>
+    /// <param name="source">Observable source.</param>
+    /// <returns>The date picker for chaining.</returns>
     public static DatePicker BindSelectedDate(this DatePicker datePicker, ObservableValue<DateTime?> source)
     {
         ArgumentNullException.ThrowIfNull(datePicker);
@@ -3430,6 +4313,276 @@ public static class ControlExtensions
         return datePicker;
     }
 
+    /// <summary>
+    /// Binds the selected date to a converted observable value.
+    /// </summary>
+    /// <typeparam name="TSource">Source value type.</typeparam>
+    /// <param name="datePicker">Target date picker.</param>
+    /// <param name="source">Observable source.</param>
+    /// <param name="convert">Source-to-date converter.</param>
+    /// <param name="convertBack">Optional date-to-source converter.</param>
+    /// <returns>The date picker for chaining.</returns>
+    public static DatePicker BindSelectedDate<TSource>(
+        this DatePicker datePicker,
+        ObservableValue<TSource> source,
+        Func<TSource, DateTime?> convert,
+        Func<DateTime?, TSource>? convertBack = null)
+    {
+        ArgumentNullException.ThrowIfNull(datePicker);
+        ArgumentNullException.ThrowIfNull(source);
+        ArgumentNullException.ThrowIfNull(convert);
+
+        datePicker.SetBinding(DatePicker.SelectedDateProperty, source, convert, convertBack);
+        return datePicker;
+    }
+
+    #endregion
+
+    #region ControlTemplate
+
+    /// <summary>
+    /// Sets the template child.
+    /// </summary>
+    /// <param name="template">Target control template.</param>
+    /// <param name="child">Template child.</param>
+    /// <returns>The template for chaining.</returns>
+    public static ControlTemplate Child(this ControlTemplate template, Element? child)
+    {
+        template.Child = child;
+        return template;
+    }
+
+    /// <summary>
+    /// Sets the template content.
+    /// </summary>
+    /// <param name="template">Target control template.</param>
+    /// <param name="content">Template content.</param>
+    /// <returns>The template for chaining.</returns>
+    public static ControlTemplate Content(this ControlTemplate template, Element? content)
+    {
+        template.Content = content;
+        return template;
+    }
+
+    #endregion
+
+    #region DropDownBase
+
+    /// <summary>
+    /// Sets whether the dropdown is open.
+    /// </summary>
+    /// <typeparam name="T">Dropdown control type.</typeparam>
+    /// <param name="control">Target dropdown control.</param>
+    /// <param name="value">Whether the dropdown is open.</param>
+    /// <returns>The control for chaining.</returns>
+    public static T IsDropDownOpen<T>(this T control, bool value = true) where T : DropDownBase
+    {
+        control.IsDropDownOpen = value;
+        return control;
+    }
+
+    /// <summary>
+    /// Sets the maximum dropdown height.
+    /// </summary>
+    /// <typeparam name="T">Dropdown control type.</typeparam>
+    /// <param name="control">Target dropdown control.</param>
+    /// <param name="value">Maximum dropdown height.</param>
+    /// <returns>The control for chaining.</returns>
+    public static T MaxDropDownHeight<T>(this T control, double value) where T : DropDownBase
+    {
+        control.MaxDropDownHeight = value;
+        return control;
+    }
+
+    #endregion
+
+    #region ProgressRing
+
+    /// <summary>
+    /// Sets whether the progress ring is active.
+    /// </summary>
+    /// <param name="progressRing">Target progress ring.</param>
+    /// <param name="value">Whether the progress ring is active.</param>
+    /// <returns>The progress ring for chaining.</returns>
+    public static ProgressRing IsActive(this ProgressRing progressRing, bool value = true)
+    {
+        progressRing.IsActive = value;
+        return progressRing;
+    }
+
+    /// <summary>
+    /// Binds the active state to an observable value.
+    /// </summary>
+    /// <param name="progressRing">Target progress ring.</param>
+    /// <param name="source">Observable source.</param>
+    /// <returns>The progress ring for chaining.</returns>
+    public static ProgressRing BindIsActive(this ProgressRing progressRing, ObservableValue<bool> source)
+    {
+        progressRing.SetBinding(ProgressRing.IsActiveProperty, source);
+        return progressRing;
+    }
+
+    /// <summary>
+    /// Binds the active state to a converted observable value.
+    /// </summary>
+    /// <typeparam name="TSource">Source value type.</typeparam>
+    /// <param name="progressRing">Target progress ring.</param>
+    /// <param name="source">Observable source.</param>
+    /// <param name="convert">Source-to-active-state converter.</param>
+    /// <returns>The progress ring for chaining.</returns>
+    public static ProgressRing BindIsActive<TSource>(
+        this ProgressRing progressRing,
+        ObservableValue<TSource> source,
+        Func<TSource, bool> convert)
+    {
+        ArgumentNullException.ThrowIfNull(progressRing);
+        ArgumentNullException.ThrowIfNull(source);
+        ArgumentNullException.ThrowIfNull(convert);
+
+        progressRing.SetBinding(ProgressRing.IsActiveProperty, source, convert, mode: BindingMode.OneWay);
+        return progressRing;
+    }
+
+    #endregion
+
+    #region PromptIcon
+
+    /// <summary>
+    /// Sets the prompt icon kind.
+    /// </summary>
+    /// <param name="promptIcon">Target prompt icon.</param>
+    /// <param name="value">Prompt icon kind.</param>
+    /// <returns>The prompt icon for chaining.</returns>
+    public static PromptIcon Kind(this PromptIcon promptIcon, PromptIconKind value)
+    {
+        promptIcon.Kind = value;
+        return promptIcon;
+    }
+
+    #endregion
+
+    #region ScrollBar
+
+    /// <summary>
+    /// Sets the scrollbar orientation.
+    /// </summary>
+    /// <param name="scrollBar">Target scroll bar.</param>
+    /// <param name="value">Scrollbar orientation.</param>
+    /// <returns>The scroll bar for chaining.</returns>
+    public static ScrollBar Orientation(this ScrollBar scrollBar, MewUI.Orientation value)
+    {
+        scrollBar.Orientation = value;
+        return scrollBar;
+    }
+
+    /// <summary>
+    /// Sets the viewport size represented by the scrollbar thumb.
+    /// </summary>
+    /// <param name="scrollBar">Target scroll bar.</param>
+    /// <param name="value">Viewport size.</param>
+    /// <returns>The scroll bar for chaining.</returns>
+    public static ScrollBar ViewportSize(this ScrollBar scrollBar, double value)
+    {
+        scrollBar.ViewportSize = value;
+        return scrollBar;
+    }
+
+    #endregion
+
+    #region ShadowDecorator
+
+    /// <summary>
+    /// Sets the shadow blur radius.
+    /// </summary>
+    /// <param name="decorator">Target shadow decorator.</param>
+    /// <param name="value">Blur radius.</param>
+    /// <returns>The decorator for chaining.</returns>
+    public static ShadowDecorator BlurRadius(this ShadowDecorator decorator, double value)
+    {
+        decorator.BlurRadius = value;
+        return decorator;
+    }
+
+    /// <summary>
+    /// Sets the vertical shadow offset.
+    /// </summary>
+    /// <param name="decorator">Target shadow decorator.</param>
+    /// <param name="value">Vertical shadow offset.</param>
+    /// <returns>The decorator for chaining.</returns>
+    public static ShadowDecorator OffsetY(this ShadowDecorator decorator, double value)
+    {
+        decorator.OffsetY = value;
+        return decorator;
+    }
+
+    /// <summary>
+    /// Sets the shadow color.
+    /// </summary>
+    /// <param name="decorator">Target shadow decorator.</param>
+    /// <param name="value">Shadow color.</param>
+    /// <returns>The decorator for chaining.</returns>
+    public static ShadowDecorator ShadowColor(this ShadowDecorator decorator, Color value)
+    {
+        decorator.ShadowColor = value;
+        return decorator;
+    }
+
+    /// <summary>
+    /// Sets the shadow corner radius.
+    /// </summary>
+    /// <param name="decorator">Target shadow decorator.</param>
+    /// <param name="value">Corner radius.</param>
+    /// <returns>The decorator for chaining.</returns>
+    public static ShadowDecorator CornerRadius(this ShadowDecorator decorator, double value)
+    {
+        decorator.CornerRadius = value;
+        return decorator;
+    }
+
+    /// <summary>
+    /// Sets the decorated child.
+    /// </summary>
+    /// <param name="decorator">Target shadow decorator.</param>
+    /// <param name="child">Decorated child.</param>
+    /// <returns>The decorator for chaining.</returns>
+    public static ShadowDecorator Child(this ShadowDecorator decorator, UIElement? child)
+    {
+        decorator.Child = child;
+        return decorator;
+    }
+
+    #endregion
+
+    #region TransitionContentControl
+
+    /// <summary>
+    /// Sets the displayed content.
+    /// </summary>
+    /// <param name="control">Target transition content control.</param>
+    /// <param name="content">Content to display.</param>
+    /// <returns>The control for chaining.</returns>
+    public static TransitionContentControl Content(
+        this TransitionContentControl control,
+        Element? content)
+    {
+        control.Content = content;
+        return control;
+    }
+
+    /// <summary>
+    /// Sets the content transition.
+    /// </summary>
+    /// <param name="control">Target transition content control.</param>
+    /// <param name="transition">Content transition.</param>
+    /// <returns>The control for chaining.</returns>
+    public static TransitionContentControl Transition(
+        this TransitionContentControl control,
+        ContentTransition transition)
+    {
+        control.Transition = transition;
+        return control;
+    }
+
     #endregion
 
     #region ColorPicker
@@ -3437,6 +4590,9 @@ public static class ControlExtensions
     /// <summary>
     /// Sets the selected color.
     /// </summary>
+    /// <param name="colorPicker">Target color picker.</param>
+    /// <param name="color">Selected color.</param>
+    /// <returns>The color picker for chaining.</returns>
     public static ColorPicker SelectedColor(this ColorPicker colorPicker, Color color)
     {
         colorPicker.SelectedColor = color;
@@ -3446,6 +4602,9 @@ public static class ControlExtensions
     /// <summary>
     /// Subscribes to the selected color changed event.
     /// </summary>
+    /// <param name="colorPicker">Target color picker.</param>
+    /// <param name="handler">Event handler.</param>
+    /// <returns>The color picker for chaining.</returns>
     public static ColorPicker OnSelectedColorChanged(this ColorPicker colorPicker, Action<Color> handler)
     {
         colorPicker.SelectedColorChanged += handler;
@@ -3455,6 +4614,9 @@ public static class ControlExtensions
     /// <summary>
     /// Sets which sections are visible inside the popup.
     /// </summary>
+    /// <param name="colorPicker">Target color picker.</param>
+    /// <param name="kind">Visible color picker sections.</param>
+    /// <returns>The color picker for chaining.</returns>
     public static ColorPicker Kind(this ColorPicker colorPicker, ColorPickerKind kind)
     {
         colorPicker.Kind = kind;
@@ -3464,6 +4626,9 @@ public static class ControlExtensions
     /// <summary>
     /// Toggles alpha-channel editing in the popup and the header preview.
     /// </summary>
+    /// <param name="colorPicker">Target color picker.</param>
+    /// <param name="showAlpha">Whether alpha-channel editing is shown.</param>
+    /// <returns>The color picker for chaining.</returns>
     public static ColorPicker ShowAlpha(this ColorPicker colorPicker, bool showAlpha = true)
     {
         colorPicker.ShowAlpha = showAlpha;

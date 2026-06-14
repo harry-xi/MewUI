@@ -42,7 +42,20 @@ new Button()
 | 패턴 | 설명 | 예시 |
 |------|------|------|
 | `BindPropertyName(source)` | ObservableValue 바인딩 | `.BindText(vm.Name)` |
-| `BindPropertyName(source, converter)` | 변환 바인딩 | `.BindText(vm.Count, c => $"{c}개")` |
+| `BindPropertyName(source, convert)` | 단방향 변환 바인딩 | `.BindText(vm.Count, c => $"{c}개")` |
+| `BindPropertyName(source, convert, convertBack)` | 양방향 변환 바인딩 | `.BindValue(vm.Level, x => (double)x, x => (int)x)` |
+
+`Bind*` 편의 메서드는 컨버터 오버로드를 제공합니다. 기본 양방향 속성에서 `convertBack`을 생략하면 변환 바인딩은 의도적으로 단방향으로 동작합니다.
+
+### 속성 이름 별칭
+
+Fluent 이름은 내부 저장 방식보다 공개 개념을 따릅니다. 복합 값은 같은 공개 메서드의 오버로드로 제공합니다.
+
+```csharp
+new Border()
+    .BorderThickness(new Thickness(1, 2, 3, 4))
+    .CornerRadius(new CornerRadius(4, 8, 12, 16))
+```
 
 ### 단축 메서드
 자주 사용되는 속성은 간결한 단축 메서드 제공:
@@ -160,7 +173,19 @@ new TextBox()
 | 메서드 | 설명 |
 |--------|------|
 | `BindIsVisible(ObservableValue<bool>)` | 가시성 바인딩 |
+| `BindIsVisible(source, convert)` | 변환된 가시성 바인딩 |
 | `BindIsEnabled(ObservableValue<bool>)` | 활성화 바인딩 |
+| `BindIsEnabled(source, convert)` | 변환된 활성화 상태 바인딩 |
+
+### 입력 및 드래그 앤 드롭
+
+| 메서드 | 설명 |
+|--------|------|
+| `IsHitTestVisible(bool)` | 히트 테스트 참여 여부 |
+| `AllowDrop(bool)` | 드롭 허용 |
+| `CanDrag(bool)` | 드래그 시작 허용 |
+| `OnDragEnter(...)`, `OnDragOver(...)`, `OnDragLeave(...)`, `OnDrop(...)` | 드롭 대상 이벤트 |
+| `OnDragStarting(...)`, `OnDragCompleted(...)` | 드래그 소스 이벤트 |
 
 ### 포커스 이벤트
 
@@ -202,6 +227,9 @@ new TextBox()
 | `Foreground(Color)` | 전경색 (텍스트) |
 | `BorderBrush(Color)` | 테두리 색상 |
 | `BorderThickness(double)` | 테두리 두께 |
+| `BorderThickness(Thickness)` | 각 변의 테두리 두께 |
+| `CornerRadius(double)` | 균일 모서리 반경 |
+| `CornerRadius(CornerRadius)` | 모서리별 반경 |
 
 ### 폰트
 
@@ -230,14 +258,17 @@ new Window()
 | 메서드 | 설명 |
 |--------|------|
 | `Title(string)` | 창 제목 |
-| `Width(double)` | 창 너비 |
-| `Height(double)` | 창 높이 |
-| `Size(width, height)` | 창 크기 |
 | `Resizable(width, height)` | 크기 조절 가능 |
 | `Fixed(width, height)` | 고정 크기 |
 | `FitContentWidth(fixedHeight, maxWidth)` | 콘텐츠에 맞춤 (너비) |
 | `FitContentHeight(fixedWidth, maxHeight)` | 콘텐츠에 맞춤 (높이) |
 | `FitContentSize(maxWidth, maxHeight)` | 콘텐츠에 맞춤 |
+| `StartCenterScreen()` / `StartCenterOwner()` | 초기 중앙 위치 |
+| `StartManualPosition(left, top)` | 초기 수동 위치 |
+| `Icon(IconSource?)` | 창 아이콘 |
+| `WindowState(WindowState)` | 창 상태 |
+| `CanMinimize(bool)`, `CanMaximize(bool)`, `CanClose(bool)` | 캡션 기능 |
+| `IsToolWindow(bool)`, `ShowInTaskbar(bool)` | 창 표시 방식 |
 | `Content(Element)` | 창 내용 |
 | `OnLoaded(Action)` | 로드 완료 |
 | `OnClosed(Action)` | 창 닫힘 |
@@ -250,6 +281,8 @@ new Window()
 | `OnPreviewKeyDown(Action<KeyEventArgs>)` | 키 누름 (미리보기) |
 | `OnPreviewKeyUp(Action<KeyEventArgs>)` | 키 뗌 (미리보기) |
 | `OnPreviewTextInput(Action<TextInputEventArgs>)` | 텍스트 입력 (미리보기) |
+
+`Window`에는 `Width`, `Height`, `Size`, `MinWidth`, `MinHeight`, `MaxWidth`, `MaxHeight`를 사용할 수 없습니다. 창 크기 모드를 명확히 지정하도록 `Resizable`, `Fixed`, `FitContent*` 메서드를 사용합니다.
 
 ### Label
 
@@ -284,6 +317,7 @@ new Button()
 | `OnClick(Action)` | 클릭 핸들러 |
 | `OnCanClick(Func<bool>)` | 클릭 가능 조건 (Commanding) |
 | `BindContent(ObservableValue<string>)` | 콘텐츠 바인딩 |
+| `BindContent(source, convert)` | 변환된 텍스트 또는 요소 콘텐츠 바인딩 |
 
 ### TextBox
 
@@ -299,8 +333,13 @@ new TextBox()
 | `Placeholder(string)` | 플레이스홀더 |
 | `IsReadOnly(bool)` | 읽기 전용 |
 | `AcceptTab(bool)` | 탭 키 허용 |
+| `AcceptReturn(bool)` | 리턴 문자 허용 |
+| `CaretPosition(int)` | 캐럿 위치 |
+| `ImeMode(ImeMode)` | 입력기 모드 |
+| `MaxLength(int)` | 최대 텍스트 길이 |
 | `OnTextChanged(Action<string>)` | 텍스트 변경 핸들러 |
 | `BindText(ObservableValue<string>)` | 텍스트 바인딩 (양방향) |
+| `BindText(source, convert, convertBack?)` | 변환된 텍스트 바인딩 |
 
 ### MultiLineTextBox
 
@@ -321,6 +360,7 @@ new MultiLineTextBox()
 | `OnWrapChanged(Action<bool>)` | 줄바꿈 변경 핸들러 |
 | `OnTextChanged(Action<string>)` | 텍스트 변경 핸들러 |
 | `BindText(ObservableValue<string>)` | 텍스트 바인딩 |
+| `BindText(source, convert, convertBack?)` | 변환된 텍스트 바인딩 |
 
 ### CheckBox
 
@@ -340,6 +380,7 @@ new CheckBox()
 | `OnCheckedChanged(Action<bool>)` | 체크 변경 핸들러 |
 | `BindIsChecked(ObservableValue<bool>)` | 체크 바인딩 |
 | `BindIsChecked(ObservableValue<bool?>)` | nullable 체크 바인딩 |
+| `BindIsChecked(source, convert, convertBack?)` | 변환된 체크 상태 바인딩 |
 | `OnCheckStateChanged(Action<bool?>)` | 3상태 변경 핸들러 |
 
 ### RadioButton
@@ -358,6 +399,7 @@ new RadioButton()
 | `IsChecked(bool)` | 선택 상태 |
 | `OnCheckedChanged(Action<bool>)` | 선택 변경 핸들러 |
 | `BindIsChecked(ObservableValue<bool>)` | 선택 바인딩 |
+| `BindIsChecked(source, convert, convertBack?)` | 변환된 선택 바인딩 |
 
 ### ToggleSwitch
 
@@ -373,6 +415,7 @@ new ToggleSwitch()
 | `IsChecked(bool)` | 토글 상태 |
 | `OnCheckedChanged(Action<bool>)` | 토글 변경 핸들러 |
 | `BindIsChecked(ObservableValue<bool>)` | 토글 바인딩 |
+| `BindIsChecked(source, convert, convertBack?)` | 변환된 토글 바인딩 |
 
 ### ListBox
 
@@ -391,6 +434,7 @@ new ListBox()
 | `SelectedIndex(int)` | 선택 인덱스 |
 | `OnSelectionChanged(Action<object?>)` | 선택 변경 핸들러 |
 | `BindSelectedIndex(ObservableValue<int>)` | 선택 바인딩 |
+| `BindSelectedIndex(source, convert, convertBack?)` | 변환된 선택 바인딩 |
 
 ### ComboBox
 
@@ -408,6 +452,7 @@ new ComboBox()
 | `Placeholder(string)` | 플레이스홀더 |
 | `OnSelectionChanged(Action<object?>)` | 선택 변경 핸들러 |
 | `BindSelectedIndex(ObservableValue<int>)` | 선택 바인딩 |
+| `BindSelectedIndex(source, convert, convertBack?)` | 변환된 선택 바인딩 |
 
 ### GridView
 
@@ -460,6 +505,7 @@ new Slider()
 | `SmallChange(double)` | 작은 변경 단위 |
 | `OnValueChanged(Action<double>)` | 값 변경 핸들러 |
 | `BindValue(ObservableValue<double>)` | 값 바인딩 |
+| `BindValue(source, convert, convertBack?)` | 변환된 값 바인딩 |
 
 ### ProgressBar
 
@@ -476,6 +522,7 @@ new ProgressBar()
 | `Maximum(double)` | 최대값 |
 | `Value(double)` | 현재값 |
 | `BindValue(ObservableValue<double>)` | 값 바인딩 |
+| `BindValue(source, convert)` | 변환된 단방향 값 바인딩 |
 
 ### Calendar
 
@@ -488,6 +535,7 @@ new ProgressBar()
 | `IsTodayHighlighted(bool)` | 오늘 강조 |
 | `OnSelectedDateChanged(Action<DateTime?>)` | 선택 날짜 변경 핸들러 |
 | `BindSelectedDate(ObservableValue<DateTime?>)` | 선택 날짜 바인딩 |
+| `BindSelectedDate(source, convert, convertBack?)` | 변환된 선택 날짜 바인딩 |
 
 ### DatePicker
 
@@ -499,6 +547,7 @@ new ProgressBar()
 | `FirstDayOfWeek(DayOfWeek)` | 주의 첫 요일 |
 | `OnSelectedDateChanged(Action<DateTime?>)` | 선택 날짜 변경 핸들러 |
 | `BindSelectedDate(ObservableValue<DateTime?>)` | 선택 날짜 바인딩 |
+| `BindSelectedDate(source, convert, convertBack?)` | 변환된 선택 날짜 바인딩 |
 
 ### ColorPicker
 
@@ -798,6 +847,7 @@ new DockPanel()
 | `ChangeOnWheel(...)` | 마우스 휠 값/선택 변경 |
 | `MaxMenuHeight(...)` | ContextMenu 높이 제한 |
 | `IsExpanded(...)`, `BindIsExpanded(...)`, `OnExpandedChanged(...)` | 확장 상태 |
+| `IsActive(...)`, `BindIsActive(...)` | ProgressRing 실행 상태 |
 
 ### 입력 컨트롤
 

@@ -25,10 +25,22 @@ public static class MenuExtensions
     /// <param name="menu">Target menu.</param>
     /// <param name="itemPadding">Item padding.</param>
     /// <returns>The menu for chaining.</returns>
-    public static Menu ItemPadding(this Menu menu, Thickness itemPadding)
+    public static Menu ItemPadding(this Menu menu, Thickness? itemPadding)
     {
         menu.ItemPadding = itemPadding;
         return menu;
+    }
+
+    /// <summary>
+    /// Sets whether the menu bar draws a bottom separator.
+    /// </summary>
+    /// <param name="bar">Target menu bar.</param>
+    /// <param name="value">Whether to draw the separator.</param>
+    /// <returns>The menu bar for chaining.</returns>
+    public static MenuBar DrawBottomSeparator(this MenuBar bar, bool value = true)
+    {
+        bar.DrawBottomSeparator = value;
+        return bar;
     }
 
     /// <summary>
@@ -108,15 +120,70 @@ public static class MenuExtensions
     /// <summary>
     /// Sets the keyboard shortcut gesture. Auto-generates display text.
     /// </summary>
-    public static MenuItem Shortcut(this MenuItem item, KeyGesture gesture)
+    /// <param name="item">Target menu item.</param>
+    /// <param name="gesture">Keyboard shortcut gesture.</param>
+    /// <returns>The menu item for chaining.</returns>
+    public static MenuItem Shortcut(this MenuItem item, KeyGesture? gesture)
     {
         item.Shortcut = gesture;
         return item;
     }
 
     /// <summary>
+    /// Sets whether the menu item is enabled.
+    /// </summary>
+    /// <param name="item">Target menu item.</param>
+    /// <param name="value">Whether the item is enabled.</param>
+    /// <returns>The menu item for chaining.</returns>
+    public static MenuItem IsEnabled(this MenuItem item, bool value = true)
+    {
+        item.IsEnabled = value;
+        return item;
+    }
+
+    /// <summary>
+    /// Sets the predicate that determines whether the menu item can be clicked.
+    /// </summary>
+    /// <param name="item">Target menu item.</param>
+    /// <param name="value">Can-click predicate.</param>
+    /// <returns>The menu item for chaining.</returns>
+    public static MenuItem CanClick(this MenuItem item, Func<bool>? value)
+    {
+        item.CanClick = value;
+        return item;
+    }
+
+    /// <summary>
+    /// Sets the menu item click action.
+    /// </summary>
+    /// <param name="item">Target menu item.</param>
+    /// <param name="value">Click action.</param>
+    /// <returns>The menu item for chaining.</returns>
+    public static MenuItem Click(this MenuItem item, Action? value)
+    {
+        item.Click = value;
+        return item;
+    }
+
+    /// <summary>
+    /// Sets the nested submenu.
+    /// </summary>
+    /// <param name="item">Target menu item.</param>
+    /// <param name="value">Nested submenu.</param>
+    /// <returns>The menu item for chaining.</returns>
+    public static MenuItem SubMenu(this MenuItem item, Menu? value)
+    {
+        item.SubMenu = value;
+        return item;
+    }
+
+    /// <summary>
     /// Sets the keyboard shortcut gesture by key and modifiers. Auto-generates display text.
     /// </summary>
+    /// <param name="item">Target menu item.</param>
+    /// <param name="key">Shortcut key.</param>
+    /// <param name="modifiers">Shortcut modifiers.</param>
+    /// <returns>The menu item for chaining.</returns>
     public static MenuItem Shortcut(this MenuItem item, Key key, ModifierKeys modifiers = ModifierKeys.None)
     {
         item.Shortcut = new KeyGesture(key, modifiers);
@@ -195,4 +262,3 @@ public static class MenuExtensions
         return menu;
     }
 }
-

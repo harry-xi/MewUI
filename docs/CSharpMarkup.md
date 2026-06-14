@@ -42,7 +42,20 @@ All extension methods return `this` to enable method chaining.
 | Pattern | Description | Example |
 |---------|-------------|---------|
 | `BindPropertyName(source)` | ObservableValue binding | `.BindText(vm.Name)` |
-| `BindPropertyName(source, converter)` | Conversion binding | `.BindText(vm.Count, c => $"{c} items")` |
+| `BindPropertyName(source, convert)` | One-way conversion binding | `.BindText(vm.Count, c => $"{c} items")` |
+| `BindPropertyName(source, convert, convertBack)` | Two-way conversion binding | `.BindValue(vm.Level, x => (double)x, x => (int)x)` |
+
+Converter overloads are available for the `Bind*` convenience methods. For properties that bind two-way by default, omitting `convertBack` intentionally makes the converted binding one-way.
+
+### Property Name Aliases
+
+Fluent names follow the public concept rather than internal storage details. Composite values use overloads of the same public method:
+
+```csharp
+new Border()
+    .BorderThickness(new Thickness(1, 2, 3, 4))
+    .CornerRadius(new CornerRadius(4, 8, 12, 16))
+```
 
 ### Shortcut Methods
 Frequently used properties have concise shortcut methods:
@@ -160,7 +173,19 @@ Base class for all elements that handle input events.
 | Method | Description |
 |--------|-------------|
 | `BindIsVisible(ObservableValue<bool>)` | Visibility binding |
+| `BindIsVisible(source, convert)` | Converted visibility binding |
 | `BindIsEnabled(ObservableValue<bool>)` | Enabled binding |
+| `BindIsEnabled(source, convert)` | Converted enabled-state binding |
+
+### Input and Drag-and-Drop
+
+| Method | Description |
+|--------|-------------|
+| `IsHitTestVisible(bool)` | Hit-test participation |
+| `AllowDrop(bool)` | Accept drop operations |
+| `CanDrag(bool)` | Allow drag operations to start |
+| `OnDragEnter(...)`, `OnDragOver(...)`, `OnDragLeave(...)`, `OnDrop(...)` | Drop-target events |
+| `OnDragStarting(...)`, `OnDragCompleted(...)` | Drag-source events |
 
 ### Focus Events
 
@@ -202,6 +227,9 @@ Base class for all controls with visual styling.
 | `Foreground(Color)` | Foreground color (text) |
 | `BorderBrush(Color)` | Border color |
 | `BorderThickness(double)` | Border thickness |
+| `BorderThickness(Thickness)` | Per-edge border thickness |
+| `CornerRadius(double)` | Uniform corner radius |
+| `CornerRadius(CornerRadius)` | Per-corner radius |
 
 ### Font
 
@@ -230,14 +258,17 @@ new Window()
 | Method | Description |
 |--------|-------------|
 | `Title(string)` | Window title |
-| `Width(double)` | Window width |
-| `Height(double)` | Window height |
-| `Size(width, height)` | Window size |
 | `Resizable(width, height)` | Resizable |
 | `Fixed(width, height)` | Fixed size |
 | `FitContentWidth(fixedHeight, maxWidth)` | Fit content (width) |
 | `FitContentHeight(fixedWidth, maxHeight)` | Fit content (height) |
 | `FitContentSize(maxWidth, maxHeight)` | Fit content |
+| `StartCenterScreen()` / `StartCenterOwner()` | Initial centered position |
+| `StartManualPosition(left, top)` | Initial manual position |
+| `Icon(IconSource?)` | Window icon |
+| `WindowState(WindowState)` | Window state |
+| `CanMinimize(bool)`, `CanMaximize(bool)`, `CanClose(bool)` | Caption capabilities |
+| `IsToolWindow(bool)`, `ShowInTaskbar(bool)` | Window presentation |
 | `Content(Element)` | Window content |
 | `OnLoaded(Action)` | Load completed |
 | `OnClosed(Action)` | Window closed |
@@ -250,6 +281,8 @@ new Window()
 | `OnPreviewKeyDown(Action<KeyEventArgs>)` | Key down (preview) |
 | `OnPreviewKeyUp(Action<KeyEventArgs>)` | Key up (preview) |
 | `OnPreviewTextInput(Action<TextInputEventArgs>)` | Text input (preview) |
+
+`Width`, `Height`, `Size`, `MinWidth`, `MinHeight`, `MaxWidth`, and `MaxHeight` are intentionally unavailable for `Window`. Use `Resizable`, `Fixed`, or a `FitContent*` method so the window sizing mode is explicit.
 
 ### Label
 
@@ -284,6 +317,7 @@ new Button()
 | `OnClick(Action)` | Click handler |
 | `OnCanClick(Func<bool>)` | Click condition (Commanding) |
 | `BindContent(ObservableValue<string>)` | Content binding |
+| `BindContent(source, convert)` | Converted text or element content binding |
 
 ### TextBox
 
@@ -299,8 +333,13 @@ new TextBox()
 | `Placeholder(string)` | Placeholder |
 | `IsReadOnly(bool)` | Read only |
 | `AcceptTab(bool)` | Accept tab key |
+| `AcceptReturn(bool)` | Accept return characters |
+| `CaretPosition(int)` | Caret position |
+| `ImeMode(ImeMode)` | Input method editor mode |
+| `MaxLength(int)` | Maximum text length |
 | `OnTextChanged(Action<string>)` | Text changed handler |
 | `BindText(ObservableValue<string>)` | Text binding (two-way) |
+| `BindText(source, convert, convertBack?)` | Converted text binding |
 
 ### MultiLineTextBox
 
@@ -321,6 +360,7 @@ new MultiLineTextBox()
 | `OnWrapChanged(Action<bool>)` | Wrap changed handler |
 | `OnTextChanged(Action<string>)` | Text changed handler |
 | `BindText(ObservableValue<string>)` | Text binding |
+| `BindText(source, convert, convertBack?)` | Converted text binding |
 
 ### CheckBox
 
@@ -340,6 +380,7 @@ new CheckBox()
 | `OnCheckedChanged(Action<bool>)` | Checked changed handler |
 | `BindIsChecked(ObservableValue<bool>)` | Checked binding |
 | `BindIsChecked(ObservableValue<bool?>)` | Nullable checked binding |
+| `BindIsChecked(source, convert, convertBack?)` | Converted checked-state binding |
 | `OnCheckStateChanged(Action<bool?>)` | Three-state change handler |
 
 ### RadioButton
@@ -358,6 +399,7 @@ new RadioButton()
 | `IsChecked(bool)` | Selected state |
 | `OnCheckedChanged(Action<bool>)` | Selection changed handler |
 | `BindIsChecked(ObservableValue<bool>)` | Selection binding |
+| `BindIsChecked(source, convert, convertBack?)` | Converted selection binding |
 
 ### ToggleSwitch
 
@@ -373,6 +415,7 @@ new ToggleSwitch()
 | `IsChecked(bool)` | Toggle state |
 | `OnCheckedChanged(Action<bool>)` | Toggle changed handler |
 | `BindIsChecked(ObservableValue<bool>)` | Toggle binding |
+| `BindIsChecked(source, convert, convertBack?)` | Converted toggle binding |
 
 ### ListBox
 
@@ -391,6 +434,7 @@ new ListBox()
 | `SelectedIndex(int)` | Selected index |
 | `OnSelectionChanged(Action<object?>)` | Selection changed handler |
 | `BindSelectedIndex(ObservableValue<int>)` | Selection binding |
+| `BindSelectedIndex(source, convert, convertBack?)` | Converted selection binding |
 
 ### ComboBox
 
@@ -408,6 +452,7 @@ new ComboBox()
 | `Placeholder(string)` | Placeholder |
 | `OnSelectionChanged(Action<object?>)` | Selection changed handler |
 | `BindSelectedIndex(ObservableValue<int>)` | Selection binding |
+| `BindSelectedIndex(source, convert, convertBack?)` | Converted selection binding |
 
 ### GridView
 
@@ -460,6 +505,7 @@ new Slider()
 | `SmallChange(double)` | Small change unit |
 | `OnValueChanged(Action<double>)` | Value changed handler |
 | `BindValue(ObservableValue<double>)` | Value binding |
+| `BindValue(source, convert, convertBack?)` | Converted value binding |
 
 ### ProgressBar
 
@@ -476,6 +522,7 @@ new ProgressBar()
 | `Maximum(double)` | Maximum value |
 | `Value(double)` | Current value |
 | `BindValue(ObservableValue<double>)` | Value binding |
+| `BindValue(source, convert)` | Converted one-way value binding |
 
 ### Calendar
 
@@ -488,6 +535,7 @@ new ProgressBar()
 | `IsTodayHighlighted(bool)` | Highlight today |
 | `OnSelectedDateChanged(Action<DateTime?>)` | Selected date changed handler |
 | `BindSelectedDate(ObservableValue<DateTime?>)` | Selected date binding |
+| `BindSelectedDate(source, convert, convertBack?)` | Converted selected date binding |
 
 ### DatePicker
 
@@ -499,6 +547,7 @@ new ProgressBar()
 | `FirstDayOfWeek(DayOfWeek)` | First day of week |
 | `OnSelectedDateChanged(Action<DateTime?>)` | Selected date changed handler |
 | `BindSelectedDate(ObservableValue<DateTime?>)` | Selected date binding |
+| `BindSelectedDate(source, convert, convertBack?)` | Converted selected date binding |
 
 ### ColorPicker
 
@@ -798,6 +847,7 @@ The tables below index the remaining public markup extensions. Some methods have
 | `ChangeOnWheel(...)` | Mouse-wheel value/selection changes |
 | `MaxMenuHeight(...)` | Context menu height limit |
 | `IsExpanded(...)`, `BindIsExpanded(...)`, `OnExpandedChanged(...)` | Expanded state |
+| `IsActive(...)`, `BindIsActive(...)` | ProgressRing activity |
 
 ### Input Controls
 
