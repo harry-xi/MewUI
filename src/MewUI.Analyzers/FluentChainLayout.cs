@@ -30,7 +30,7 @@ internal static class FluentChainLayout
         return count;
     }
 
-    public static ExpressionSyntax Format(InvocationExpressionSyntax top, string baseIndent, bool expand, string newline)
+    public static ExpressionSyntax Format(InvocationExpressionSyntax top, string baseIndent, bool expand, string newline, SemanticModel model)
     {
         var calls = new List<(SimpleNameSyntax Name, ArgumentListSyntax Arguments)>();
         ExpressionSyntax current = top;
@@ -54,23 +54,47 @@ internal static class FluentChainLayout
                 built,
                 SyntaxFactory.Token(SyntaxKind.DotToken).WithLeadingTrivia(dotLeading),
                 name.WithoutTrivia());
-            built = SyntaxFactory.InvocationExpression(memberAccess, FormatArguments(arguments, dotIndent, expand, newline));
+            built = SyntaxFactory.InvocationExpression(memberAccess, FormatArguments(arguments, dotIndent, expand, newline, model));
         }
 
         return built;
     }
 
-    // Break the argument list onto its own lines only when an argument is itself an expandable chain
-    // (the nested markup tree). Simple argument lists stay inline.
-    private static ArgumentListSyntax FormatArguments(ArgumentListSyntax arguments, string callIndent, bool expand, string newline)
+    // An element chain (rooted in `new X()`, a call, or a value) is expanded as its own tree; a chain
+    // rooted in a type (e.g. `Color.FromRgb(...)`, a static factory) is a value and stays inline.
+    private static bool IsElementChain(ExpressionSyntax expression, SemanticModel model)
+    {
+        if (expression is not InvocationExpressionSyntax || ChainLength(expression) < 1)
+        {
+            return false;
+        }
+
+        ExpressionSyntax root = expression;
+        while (root is InvocationExpressionSyntax invocation && invocation.Expression is MemberAccessExpressionSyntax access)
+        {
+            root = access.Expression;
+        }
+
+        if (root is ObjectCreationExpressionSyntax or InvocationExpressionSyntax)
+        {
+            return true;
+        }
+
+        var symbol = model.GetSymbolInfo(root).Symbol;
+        return symbol is not null and not ITypeSymbol and not INamespaceSymbol;
+    }
+
+    // Break the argument list onto its own lines when it has element children, expanding each as a
+    // tree (separated by a blank line). Value arguments and type-rooted calls stay inline.
+    private static ArgumentListSyntax FormatArguments(ArgumentListSyntax arguments, string callIndent, bool expand, string newline, SemanticModel model)
     {
         var list = arguments.Arguments;
-        var breakList = expand && list.Any(argument => ChainLength(argument.Expression) >= MinLinks);
+        var breakList = expand && list.Any(argument => IsElementChain(argument.Expression, model));
 
         if (!breakList)
         {
             var inline = list.Select(argument => SyntaxFactory.Argument(
-                argument.NameColon, argument.RefKindKeyword, InlineValue(argument.Expression, newline)));
+                argument.NameColon, argument.RefKindKeyword, InlineValue(argument.Expression, newline, model)));
             var spacedCommas = Enumerable.Repeat(
                 SyntaxFactory.Token(SyntaxKind.CommaToken).WithTrailingTrivia(SyntaxFactory.Space),
                 System.Math.Max(0, list.Count - 1));
@@ -78,13 +102,18 @@ internal static class FluentChainLayout
         }
 
         var argIndent = callIndent + Unit;
-        var formatted = list.Select(argument =>
+        var firstLeading = Break(argIndent, newline);
+        // Siblings are separated by a blank line.
+        var siblingLeading = SyntaxFactory.TriviaList(
+            SyntaxFactory.EndOfLine(newline), SyntaxFactory.EndOfLine(newline), SyntaxFactory.Whitespace(argIndent));
+
+        var formatted = list.Select((argument, index) =>
         {
-            var value = ChainLength(argument.Expression) >= MinLinks
-                ? Format((InvocationExpressionSyntax)argument.Expression, argIndent, expand: true, newline)
-                : argument.Expression.WithoutTrivia();
+            var value = IsElementChain(argument.Expression, model)
+                ? Format((InvocationExpressionSyntax)argument.Expression, argIndent, expand: true, newline, model)
+                : InlineValue(argument.Expression, newline, model);
             return SyntaxFactory.Argument(argument.NameColon, argument.RefKindKeyword, value)
-                .WithLeadingTrivia(Break(argIndent, newline));
+                .WithLeadingTrivia(index == 0 ? firstLeading : siblingLeading);
         });
 
         var commas = Enumerable.Repeat(SyntaxFactory.Token(SyntaxKind.CommaToken), System.Math.Max(0, list.Count - 1));
@@ -95,9 +124,9 @@ internal static class FluentChainLayout
     }
 
     // An inline argument: collapse a nested chain back to one line, otherwise just strip outer trivia.
-    private static ExpressionSyntax InlineValue(ExpressionSyntax expression, string newline)
+    private static ExpressionSyntax InlineValue(ExpressionSyntax expression, string newline, SemanticModel model)
         => expression is InvocationExpressionSyntax chain && ChainLength(expression) >= 1
-            ? Format(chain, string.Empty, expand: false, newline)
+            ? Format(chain, string.Empty, expand: false, newline, model)
             : expression.WithoutTrivia();
 
     private static SyntaxTriviaList Break(string indent, string newline)

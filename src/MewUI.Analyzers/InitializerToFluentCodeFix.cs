@@ -101,7 +101,7 @@ public sealed class InitializerToFluentCodeFix : CodeFixProvider
         var baseIndent = lineText.Substring(0, lineText.Length - lineText.TrimStart().Length);
 
         var formatted = FluentChainLayout
-            .Format((InvocationExpressionSyntax)chain, baseIndent, convertible.Count >= FluentChainLayout.MinLinks, newline)
+            .Format((InvocationExpressionSyntax)chain, baseIndent, convertible.Count >= FluentChainLayout.MinLinks, newline, model)
             .WithTriviaFrom(creation);
 
         return document.WithSyntaxRoot(root.ReplaceNode(creation, formatted));

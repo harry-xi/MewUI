@@ -206,7 +206,7 @@ public sealed class MergeChainStatementsRefactoring : CodeRefactoringProvider
         if (accumulator is InvocationExpressionSyntax merged)
         {
             accumulator = FluentChainLayout.Format(
-                merged, baseIndent, FluentChainLayout.ChainLength(merged) >= FluentChainLayout.MinLinks, newline);
+                merged, baseIndent, FluentChainLayout.ChainLength(merged) >= FluentChainLayout.MinLinks, newline, model);
         }
 
         var mergedStatement = refMethod is not null

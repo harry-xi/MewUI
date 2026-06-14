@@ -29,20 +29,17 @@ public sealed class FluentChainFormatRefactoring : CodeRefactoringProvider
             return;
         }
 
-        if (IsExpanded(top))
-        {
-            context.RegisterRefactoring(CodeAction.Create(
-                "Collapse fluent chain to one line",
-                cancellationToken => FormatAsync(context.Document, top, expand: false, cancellationToken),
-                equivalenceKey: "MewUI.CollapseFluentChain"));
-        }
-        else
-        {
-            context.RegisterRefactoring(CodeAction.Create(
-                "Expand fluent chain",
-                cancellationToken => FormatAsync(context.Document, top, expand: true, cancellationToken),
-                equivalenceKey: "MewUI.ExpandFluentChain"));
-        }
+        // Both are offered regardless of current layout: Format is idempotent, so "Expand" also
+        // re-formats an already-expanded chain in place (no need to collapse first).
+        context.RegisterRefactoring(CodeAction.Create(
+            "Expand fluent chain",
+            cancellationToken => FormatAsync(context.Document, top, expand: true, cancellationToken),
+            equivalenceKey: "MewUI.ExpandFluentChain"));
+
+        context.RegisterRefactoring(CodeAction.Create(
+            "Collapse fluent chain to one line",
+            cancellationToken => FormatAsync(context.Document, top, expand: false, cancellationToken),
+            equivalenceKey: "MewUI.CollapseFluentChain"));
     }
 
     // The outermost invocation of the chain at the caret, or null if it is not a member-access chain.
@@ -63,30 +60,12 @@ public sealed class FluentChainFormatRefactoring : CodeRefactoringProvider
         return invocation.Expression is MemberAccessExpressionSyntax ? invocation : null;
     }
 
-    // A newline may live as the receiver's trailing trivia or the dot's leading trivia; check both.
-    private static bool IsExpanded(InvocationExpressionSyntax top)
-    {
-        ExpressionSyntax current = top;
-        while (current is InvocationExpressionSyntax invocation
-               && invocation.Expression is MemberAccessExpressionSyntax access)
-        {
-            if (access.OperatorToken.LeadingTrivia.Any(trivia => trivia.IsKind(SyntaxKind.EndOfLineTrivia))
-                || access.Expression.GetTrailingTrivia().Any(trivia => trivia.IsKind(SyntaxKind.EndOfLineTrivia)))
-            {
-                return true;
-            }
-
-            current = access.Expression;
-        }
-
-        return false;
-    }
-
     private static async Task<Document> FormatAsync(Document document, InvocationExpressionSyntax top, bool expand, CancellationToken cancellationToken)
     {
         var root = await document.GetSyntaxRootAsync(cancellationToken).ConfigureAwait(false);
+        var model = await document.GetSemanticModelAsync(cancellationToken).ConfigureAwait(false);
         var text = await document.GetTextAsync(cancellationToken).ConfigureAwait(false);
-        if (root is null)
+        if (root is null || model is null)
         {
             return document;
         }
@@ -95,7 +74,7 @@ public sealed class FluentChainFormatRefactoring : CodeRefactoringProvider
         var lineText = text.Lines.GetLineFromPosition(top.SpanStart).ToString();
         var baseIndent = lineText.Substring(0, lineText.Length - lineText.TrimStart().Length);
 
-        var formatted = FluentChainLayout.Format(top, baseIndent, expand, newline)
+        var formatted = FluentChainLayout.Format(top, baseIndent, expand, newline, model)
             .WithLeadingTrivia(top.GetLeadingTrivia())
             .WithTrailingTrivia(top.GetTrailingTrivia());
 
