@@ -4,6 +4,7 @@
     <File Path="build/Aprillz.MewUI.Windows.targets" />
     <File Path="build/MewUI.Common.props" />
     <File Path="build/MewUI.Local.props" />
+    <File Path="build/MewUI.Meta.props" />
   </Folder>
   <Folder Name="/draft/">
     <Project Path="src/MewUI.Concept/MewUI.Concept.csproj" />
@@ -30,12 +31,12 @@
     <Project Path="src/MewUI.Platform.MacOS/MewUI.Platform.MacOS.csproj" />
     <Project Path="src/MewUI.Platform.Win32/MewUI.Platform.Win32.csproj" />
     <Project Path="src/MewUI.Platform.X11/MewUI.Platform.X11.csproj" />
-    <Project Path="src/MewUI.Svg/MewUI.Svg.csproj" />
     <Project Path="src/MewUI.Win32.WebView2/MewUI.Win32.WebView2.csproj" />
     <Project Path="src/MewUI/MewUI.csproj" />
   </Folder>
   <Folder Name="/extensions/">
     <Project Path="extensions/MewUI.MewDock/MewUI.MewDock.csproj" />
+    <Project Path="extensions/MewUI.Svg/MewUI.Svg.csproj" />
     <Project Path="extensions/MewUI.Skia/MewUI.Skia.csproj" />
     <Project Path="extensions/MewUI.Skia.Interop.Direct2D/MewUI.Skia.Interop.Direct2D.csproj" />
     <Project Path="extensions/MewUI.Skia.Interop.Gdi/MewUI.Skia.Interop.Gdi.csproj" />
@@ -49,7 +50,6 @@
     <Project Path="../MewVG/src/MewVG.Metal/MewVG.Metal.csproj" />
   </Folder>
   <Folder Name="/meta/">
-    <File Path="meta/MewUI.Meta.props" />
     <Project Path="meta/MewUI.All/MewUI.All.csproj" />
     <Project Path="meta/MewUI.Linux/MewUI.Linux.csproj" />
     <Project Path="meta/MewUI.MacOS/MewUI.MacOS.csproj" />
