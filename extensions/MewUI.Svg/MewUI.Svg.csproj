@@ -9,7 +9,6 @@
     <Nullable>disable</Nullable>
     <NoWarn>$(NoWarn);CS8632</NoWarn>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
-    <CLSCompliant>false</CLSCompliant>
     <Description>SVG rendering support for $(MewUITitle). Pure managed implementation via System.Xml.Linq — no System.Drawing dependency, NativeAOT compatible.</Description>
   </PropertyGroup>
 
@@ -56,9 +55,5 @@
   
   <ItemGroup>
     <ProjectReference Include="ThirdParty\SvgNet\Generators\Svg.Generators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
-  </ItemGroup>
-  
-  <ItemGroup>
-    <Folder Include="ThirdParty\SvgNet\Source\Properties\" />
   </ItemGroup>
 </Project>
