@@ -66,7 +66,7 @@ public sealed class OffscreenTextAlphaTests
             return;
         }
 
-        GdiGraphicsFactory factory = GdiGraphicsFactory.Instance;
+        GdiGraphicsFactory factory = new GdiGraphicsFactory();
 
         IRenderSurface source = factory.CreateSurface(RenderSurfaceDescriptor.CachedImage(Width, Height, 1.0));
         IRenderSurface dest = factory.CreateSurface(RenderSurfaceDescriptor.CachedImage(Width, Height, 1.0));
@@ -129,7 +129,7 @@ public sealed class OffscreenTextAlphaTests
             return;
         }
 
-        GdiGraphicsFactory factory = GdiGraphicsFactory.Instance;
+        GdiGraphicsFactory factory = new GdiGraphicsFactory();
         Application.DefaultGraphicsFactory = factory;   // TextBlock.Measure needs a factory for text measurement
         IRenderSurface surface = factory.CreateSurface(RenderSurfaceDescriptor.CachedImage(Width, Height, 1.0));
         try
@@ -203,7 +203,7 @@ public sealed class OffscreenTextAlphaTests
         const double dpi = 1.5;
         int pxW = (int)(Width * dpi), pxH = (int)(Height * dpi);
 
-        GdiGraphicsFactory factory = GdiGraphicsFactory.Instance;
+        GdiGraphicsFactory factory = new GdiGraphicsFactory();
         Application.DefaultGraphicsFactory = factory;
 
         IRenderSurface cache = factory.CreateSurface(RenderSurfaceDescriptor.CachedImage(pxW, pxH, dpi));
@@ -281,7 +281,7 @@ public sealed class OffscreenTextAlphaTests
             return;
         }
 
-        GdiGraphicsFactory factory = GdiGraphicsFactory.Instance;
+        GdiGraphicsFactory factory = new GdiGraphicsFactory();
         Application.DefaultGraphicsFactory = factory;
 
         // Larger surface; place the cached label at a non-zero offset (as inside a padded StackPanel).
@@ -346,7 +346,7 @@ public sealed class OffscreenTextAlphaTests
             return;
         }
 
-        GdiGraphicsFactory factory = GdiGraphicsFactory.Instance;
+        GdiGraphicsFactory factory = new GdiGraphicsFactory();
         Application.DefaultGraphicsFactory = factory;
 
         const int surfaceWidth = 260;
@@ -403,7 +403,7 @@ public sealed class OffscreenTextAlphaTests
             return;
         }
 
-        GdiGraphicsFactory factory = GdiGraphicsFactory.Instance;
+        GdiGraphicsFactory factory = new GdiGraphicsFactory();
         Application.DefaultGraphicsFactory = factory;
 
         const int surfaceWidth = 240;
@@ -471,7 +471,7 @@ public sealed class OffscreenTextAlphaTests
             return;
         }
 
-        GdiGraphicsFactory factory = GdiGraphicsFactory.Instance;
+        GdiGraphicsFactory factory = new GdiGraphicsFactory();
         Application.DefaultGraphicsFactory = factory;
 
         const int surfaceWidth = 240;
@@ -546,7 +546,7 @@ public sealed class OffscreenTextAlphaTests
 
     private static (int maxAlpha, int coveredPixels) RenderTextAndMeasureAlpha(bool fillOpaqueBackground)
     {
-        GdiGraphicsFactory factory = GdiGraphicsFactory.Instance;
+        GdiGraphicsFactory factory = new GdiGraphicsFactory();
         IRenderSurface surface = factory.CreateSurface(RenderSurfaceDescriptor.CachedImage(Width, Height, 1.0));
         try
         {
