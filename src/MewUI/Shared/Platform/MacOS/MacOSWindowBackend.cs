@@ -1345,7 +1345,8 @@ internal sealed class MacOSWindowBackend : IWindowBackend
             _leftDown,
             _rightDown,
             _middleDown,
-            clickCount);
+            clickCount,
+            GetModifierKeys(ev));
     }
 
     // Trackpad point-delta → notch normalization.
@@ -1396,7 +1397,7 @@ internal sealed class MacOSWindowBackend : IWindowBackend
         WindowInputRouter.MouseWheel(
             _window, pos, screenPos,
             new Vector(notchesX, notchesY),
-            _leftDown, _rightDown, _middleDown);
+            _leftDown, _rightDown, _middleDown, GetModifierKeys(ev));
     }
 
     private void HandleKeyDown(nint ev)

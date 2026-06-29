@@ -1874,7 +1874,7 @@ internal sealed class Win32WindowBackend : IWindowBackend
         bool leftDown = (User32.GetKeyState(VirtualKeys.VK_LBUTTON) & 0x8000) != 0;
         bool rightDown = (User32.GetKeyState(VirtualKeys.VK_RBUTTON) & 0x8000) != 0;
         bool middleDown = (User32.GetKeyState(VirtualKeys.VK_MBUTTON) & 0x8000) != 0;
-        WindowInputRouter.MouseMove(Window, pos, screenPos, leftDown, rightDown, middleDown);
+        WindowInputRouter.MouseMove(Window, pos, screenPos, leftDown, rightDown, middleDown, GetModifierKeys());
 
         return 0;
     }
@@ -1946,7 +1946,8 @@ internal sealed class Win32WindowBackend : IWindowBackend
             leftDown,
             rightDown,
             middleDown,
-            clickCount);
+            clickCount,
+            GetModifierKeys());
 
         return 0;
     }
@@ -1972,7 +1973,7 @@ internal sealed class Win32WindowBackend : IWindowBackend
         var pt = new POINT(screenX, screenY);
         User32.ScreenToClient(Handle, ref pt);
         var pos = new Point(pt.x / Window.DpiScale, pt.y / Window.DpiScale);
-        WindowInputRouter.MouseWheel(Window, pos, new Point(screenX, screenY), delta);
+        WindowInputRouter.MouseWheel(Window, pos, new Point(screenX, screenY), delta, modifiers: GetModifierKeys());
 
         return 0;
     }
